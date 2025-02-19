@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { auth, database } from "../firebase";
 import { ref,onValue, update } from "firebase/database";
-import { useNavigate } from "react-router-dom";
+import { useNavigate,Link } from "react-router-dom";
+import { signOut } from "firebase/auth";
 import Swal from "sweetalert2";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../firebase"; // Import Firebase Storage
@@ -26,7 +27,7 @@ const Profile = () => {
       const data = snapshot.val();
       if (data) {
         setName(data.name || "");
-        setPhoto(data.photo || "assets/default-profile.png");
+        setPhoto(data.photo || "images/default-profile.png");
       }
     });
   }, [navigate]);
@@ -68,10 +69,42 @@ const Profile = () => {
         text: error.message,
       });
     }
+  
   };
-
+   const handleLogout = async () => {
+    await signOut(auth);
+    navigate("/signup");
+    };
   return (
-    <div className="container mt-5">
+    <div className="container-fluid">
+        <div className="row">
+          {/* Sidebar */}
+          <div className="col-md-3 bg-light p-4 vh-100 shadow">
+            <h2 className="mb-4">Menu</h2>
+            <ul className="list-unstyled">
+              <li className="mb-3">
+                <a href="/dashboard" className="text-decoration-none text-dark d-flex align-items-center">
+                  <i className="bi bi-house me-2"></i> Home
+                </a>
+              </li>
+              <li className="mb-3">
+                <p className="text-decoration-none text-dark d-flex align-items-center">
+                  <i className="bi bi-person me-2"></i><Link to="/profile">Profile</Link> 
+                </p>
+              </li>
+              <li className="mb-3">
+                <a href="/badges" className="text-decoration-none text-dark d-flex align-items-center">
+                  <i className="bi bi-award me-2"></i> Badges
+                </a>
+              </li>
+          <li className="mb-3">
+            <button onClick={handleLogout} className="btn btn-link text-decoration-none text-dark d-flex align-items-center w-100 text-start">
+              <i className="bi bi-box-arrow-right me-2"></i> Logout
+            </button>
+          </li>
+        </ul>
+      </div>
+      <div className="col-md-9 p-4">
       <div className="row justify-content-center">
         <div className="col-md-6">
           <div className="card shadow">
@@ -113,6 +146,8 @@ const Profile = () => {
           </div>
         </div>
       </div>
+    </div>
+    </div>
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { auth, database } from "../firebase";
 import { signOut } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate,Link } from "react-router-dom";
 import { ref, onValue, update } from "firebase/database";
 import Swal from "sweetalert2";
 import "./styles/Dashboard.css";
@@ -159,9 +159,7 @@ const Dashboard = () => {
       confirmButtonText: "OK",
     });
   };
-  function goProfile(){
-    navigate("/profile")
-  }
+
 
   return (
     <div className="container-fluid">
@@ -171,14 +169,14 @@ const Dashboard = () => {
         <h2 className="mb-4">Menu</h2>
         <ul className="list-unstyled">
           <li className="mb-3">
-            <a href="/" className="text-decoration-none text-dark d-flex align-items-center">
+            <a href="/dashboard" className="text-decoration-none text-dark d-flex align-items-center">
               <i className="bi bi-house me-2"></i> Home
             </a>
           </li>
           <li className="mb-3">
-            <a onclick={goProfile} className="text-decoration-none text-dark d-flex align-items-center">
-              <i className="bi bi-person me-2"></i> Profile
-            </a>
+            <p className="text-decoration-none text-dark d-flex align-items-center">
+              <i className="bi bi-person me-2"></i><Link to="/profile">Profile</Link>  
+            </p>
           </li>
           <li className="mb-3">
             <a href="/badges" className="text-decoration-none text-dark d-flex align-items-center">

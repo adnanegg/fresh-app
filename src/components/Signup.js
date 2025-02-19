@@ -25,7 +25,7 @@ const Signup = () => {
       await set(userRef, {
         profile: {
           name: name, // Use the name entered by the user
-          photo: "assets/default-profile.png", // Default profile photo
+          photo: "profile-photos/default-profile.png", // Default profile photo
         },
         points: { current: 0, total: 1000 }, // Initialize points
         xp: { current: 0, level: 1 }, // Initialize XP
