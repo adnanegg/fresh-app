@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+.xp {
+  font-family: 'Press Start 2P', cursive;
+  color: #ffcc00;
+  font-size: 10.5px;
+}
+body {
+  margin: 0;
+  padding: 0;
+  max-height: 100vh;
+  font-family: 'Poppins', sans-serif;
+  /* background-image: url('assets/background.jpg'); */
+}
+
+h1, h2, h3 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: boll;
+}
+
+/* Bronze 3D Font */
+.bronze-3d {
+  color: #cd7f32; /* Bronze color */
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  font-size: 35px;
+}
+.golden-3d {
+  color: #ffd104; /* Bronze color */
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  font-size: 35px;
+}
+
+/* Points Bar Colors */
+#points-bar {
+  background-color: #ff6b6b; /* Red for low progress */
+}
+
+#points-bar.medium {
+  background-color: #ffd166; /* Yellow for medium progress */
+}
+
+#points-bar.high {
+  background-color: #06d6a0; /* Green for high progress */
+}
+/* Sidebar styles */
+#sidebar {
+  height: auto; /* Dynamic height based on content */
+  max-height: 100vh; /* Ensure it doesn't exceed viewport height */
+  overflow-y: auto; /* Add scroll if content overflows */
+}
+
+/* Menu button styles */
+#close-menu {
+  position: absolute;
+  top: 1rem; /* Adjust top position */
+  right: 1rem; /* Adjust right position */
+}
+
+
+.main-content {
+  min-height: 200vh; /* Full viewport height */
+  padding: 2rem; /* Increase padding for smoother look */
+  margin-left: 0; /* Default margin when sidebar is hidden */
+  transition: margin-left 0.3s ease-in-out;
+}
+
+.sidebar-open .main-content {
+  margin-left: 20rem; /* Adjust based on sidebar width */
+}
+/* Background styles */
+.bg-cover {
+  background-size: cover;
+}
+
+.bg-center {
+  background-position: center;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    max-height: 80vh; /* Reduce height further on small screens */
+    padding: 1rem; /* Reduce padding on small screens */
+  }
+}
+/* Custom CSS for 3D text effect */
+.golden-3d {
+  color: #ffd104; /* Golden color */
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  font-size: 35px;
+}
+
+.bronze-3d {
+  color: #cd7f32; /* Bronze color */
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  font-size: 35px;
+}
+/* .botBox{
+  /* background-image: url('assets/taskImage.jpg'); */
+
