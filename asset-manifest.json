@@ -1,17 +1,17 @@
 {
   "files": {
-    "main.css": "/fresh-app/static/css/main.284b569b.css",
-    "main.js": "/fresh-app/static/js/main.711b9a2d.js",
-    "static/js/453.f723505b.chunk.js": "/fresh-app/static/js/453.f723505b.chunk.js",
-    "static/media/bootstrap-icons.woff?": "/fresh-app/static/media/bootstrap-icons.39795c0b4513de014cf8.woff",
-    "static/media/bootstrap-icons.woff2?": "/fresh-app/static/media/bootstrap-icons.b7bcc075b395c14ce8c2.woff2",
-    "index.html": "/fresh-app/index.html",
-    "main.284b569b.css.map": "/fresh-app/static/css/main.284b569b.css.map",
-    "main.711b9a2d.js.map": "/fresh-app/static/js/main.711b9a2d.js.map",
-    "453.f723505b.chunk.js.map": "/fresh-app/static/js/453.f723505b.chunk.js.map"
+    "main.css": "/fresh-app/build/static/css/main.6da98a80.css",
+    "main.js": "/fresh-app/build/static/js/main.8d2d56e6.js",
+    "static/js/453.f723505b.chunk.js": "/fresh-app/build/static/js/453.f723505b.chunk.js",
+    "static/media/bootstrap-icons.woff?": "/fresh-app/build/static/media/bootstrap-icons.39795c0b4513de014cf8.woff",
+    "static/media/bootstrap-icons.woff2?": "/fresh-app/build/static/media/bootstrap-icons.b7bcc075b395c14ce8c2.woff2",
+    "index.html": "/fresh-app/build/index.html",
+    "main.6da98a80.css.map": "/fresh-app/build/static/css/main.6da98a80.css.map",
+    "main.8d2d56e6.js.map": "/fresh-app/build/static/js/main.8d2d56e6.js.map",
+    "453.f723505b.chunk.js.map": "/fresh-app/build/static/js/453.f723505b.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.284b569b.css",
-    "static/js/main.711b9a2d.js"
+    "static/css/main.6da98a80.css",
+    "static/js/main.8d2d56e6.js"
   ]
 }
