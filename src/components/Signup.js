@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { auth, database } from "../firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { ref, set } from "firebase/database";
+import { ref, set,get,child } from "firebase/database";
 import { useNavigate,Link } from "react-router-dom";
 import "./styles/Signup.css"
 const Signup = () => {
@@ -19,13 +19,26 @@ const Signup = () => {
 
       // Generate a random ID for the user (optional, you can use the UID from Firebase Auth)
       const userId = user.uid; // Use Firebase UID as the user ID
-
+       // Fetch rank thresholds from the database
+       const dbRef = ref(database);
+       const snapshot = await get(child(dbRef, 'xpthresholds'));
+       let initialRank = "Warrior";
+       let initialRankImage = "ranking-images/rank-warrior.png";
+ 
+       if (snapshot.exists()) {
+         const thresholds = snapshot.val();
+         const sortedThresholds = Object.entries(thresholds).sort((a, b) => a[1] - b[1]);
+         initialRank = sortedThresholds[0][0];
+         initialRankImage = `ranking-images/rank-${initialRank.toLowerCase()}.png`;
+       }
       // Create a user document in the Realtime Database
       const userRef = ref(database, `users/${userId}`);
       await set(userRef, {
         profile: {
           name: name, // Use the name entered by the user
-          photo: "profile-photos/default-profile.png", // Default profile photo
+          photo: "profile-photos/default-profile.png",
+          rankName: initialRank,
+          rankImage: initialRankImage, // Default profile photo
         },
         points: { current: 0, total: 1000 }, // Initialize points
         xp: { current: 0, level: 1 }, // Initialize XP

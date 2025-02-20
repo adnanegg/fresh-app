@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { auth, database } from "../firebase";
 import { signOut } from "firebase/auth";
 import { useNavigate,Link } from "react-router-dom";
-import { ref, onValue, update } from "firebase/database";
+import { ref, onValue, update,get,child } from "firebase/database";
 import Swal from "sweetalert2";
 import "./styles/Dashboard.css";
 import "./styles/style.css";
@@ -13,7 +13,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState({
     name: "User",
-    photo: "assets/default-profile.png",
+    photo: "profile-images/default-profile.png",
+    rankName: "Warrior", rankImage: "ranking-images/rank-warrior.png"
   });
   const [tasks, setTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState([]);
@@ -23,33 +24,59 @@ const Dashboard = () => {
 
   // Check if the user is authenticated
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (!user) {
-        // If the user is not logged in, redirect to the login page
-        navigate("/auth");
-      } else {
-        // If the user is logged in, fetch their data
-        const userId = user.uid;
-        const userRef = ref(database, `users/${userId}`);
+    const fetchUserData = async (userId) => {
+      const userRef = ref(database, `users/${userId}`);
+      onValue(userRef, async (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+        // const userId = user.uid;
+        // const userRef = ref(database, `users/${userId}`);
 
         // Fetch user data from Firebase
-        onValue(userRef, (snapshot) => {
-          const data = snapshot.val();
-          if (data) {
-            setUserProfile(data.profile || { name: "User", photo: "assets/default-profile.png" });
+     
+            setUserProfile(data.profile || { name: "User", photo: "/profile-photos/default-profile.png" });
             setTasks(data.tasks || []);
             setCompletedTasks(data.completedTasks || []);
             setXpData(data.xp || { current: 0, level: 1 });
             setPointsData(data.points || { current: 0, total: 1000 });
             setMpointsData(data.Mpoints || { current: 0, total: 3000 });
+
+            const dbRef = ref(database);
+            const xpSnapshot = await get(child(dbRef, 'xpthresholds'));
+            if (xpSnapshot.exists()) {
+              const thresholds = xpSnapshot.val();
+              const sortedThresholds = Object.entries(thresholds).sort((a, b) => a[1] - b[1]);
+              const userXp = data.xp.current;
+              let newRank = "Warrior";
+              let newRankImage = "ranking-images/rank-warrior.png";
+
+              for (const [rankName, xpThreshold] of sortedThresholds) {
+                if (userXp >= xpThreshold) {
+                  newRank = rankName;
+                  newRankImage = `ranking-images/rank-${rankName.toLowerCase()}.png`;
+                }
+              }
+
+              if (newRank !== data.profile.rankName) {
+                update(userRef, {
+                  "profile/rankName": newRank,
+                  "profile/rankImage": newRankImage,
+                });
+              }
+            }
           }
         });
       }
-    });
-
-    // Cleanup the subscription
-    return () => unsubscribe();
-  }, [navigate]);
+      const unsubscribe = auth.onAuthStateChanged((user) => {
+        if (!user) {
+          navigate("/login");
+        } else {
+          fetchUserData(user.uid);
+        }
+      });
+  
+      return () => unsubscribe();
+    }, [navigate]);
 
   // Handle logout
   const handleLogout = async () => {
@@ -79,16 +106,22 @@ const Dashboard = () => {
     });
   };
 
-  // Undo a task
+
+
   const undoTask = (index) => {
     const task = completedTasks[index];
     const newCompletedTasks = completedTasks.filter((_, i) => i !== index);
     const newTasks = [...tasks, task];
-
-    const newXpData = { ...xpData, current: xpData.current - task.xp };
-    const newPointsData = { ...pointsData, current: pointsData.current - task.points };
-    const newMpointsData = { ...MpointsData, current: MpointsData.current - task.points };
-
+  
+    // Ensure values do not go below zero
+    const newXp = Math.max(xpData.current - task.xp, 0);
+    const newPoints = Math.max(pointsData.current - task.points, 0);
+    const newMpoints = Math.max(MpointsData.current - task.points, 0);
+  
+    const newXpData = { ...xpData, current: newXp };
+    const newPointsData = { ...pointsData, current: newPoints };
+    const newMpointsData = { ...MpointsData, current: newMpoints };
+  
     // Update Firebase Realtime Database
     const userId = auth.currentUser?.uid;
     const userRef = ref(database, `users/${userId}`);
@@ -219,7 +252,7 @@ const Dashboard = () => {
           <div className="col-md-6">
             <div className="card text-center p-4">
               <h2 className="bronze-3d mb-3">Your Rank</h2>
-              <img src="images/rank-warrior.png" alt="Rank" className="mx-auto mb-3" width="80" height="80" />
+              <img src="ranking-images/rank-warrior.png" alt="Rank" className="mx-auto mb-3" width="80" height="80" />
               <p className="bronze-3d">Warrior</p>
             </div>
           </div>
@@ -236,7 +269,7 @@ const Dashboard = () => {
                   style={{ width: `${(xpData.current / 2000) * 100}%` }}
                 ></div>
               </div>
-              <span className="mt-2">{xpData.current}/2000 XP</span>
+              <span className="mt-2">{xpData.current}/50 XP</span>
             </div>
           </div>
           <div className="col-md-4">
