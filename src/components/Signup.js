@@ -1,4 +1,4 @@
-import React, { useState,useEffect } from "react";
+import React, { useState} from "react";
 import { auth, database } from "../firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { ref, set,get,child } from "firebase/database";
@@ -44,21 +44,36 @@ const Signup = () => {
         xp: { current: 0, level: 1 }, // Initialize XP
         tasks: [
           // Default tasks (replace with your config.tasks)
-          { name: "Book", xp: 50, points: 10, category: "Task", penalty: 5 },
-          { name: "Quran", xp: 50, points: 10, category: "Task", penalty: 5 },
-          { name: "Sport", xp: 50, points: 10, category: "Task", penalty: 5 },
-          { name: "Prayer At The Mosque", xp: 50, points: 10, category: "Task", penalty: 5 },
-          { name: "listen to quoran", xp: 50, points: 10, category: "Task", penalty: 5 },
-          { name: "15 Min Improvement", xp: 50, points: 10, category: "Task", penalty: 5 },
-          { name: "Wake up early", xp: 50, points: 10, category: "Task", penalty: 5 }, 
-          { name: "الشفع و الوتر", xp: 100, points: 40, category: "Bonus", penalty: 5 },
-          { name: "Presentation", xp: 200, points: 50, category: "Bonus", penalty: 5 },
-          { name: "One day no social Media", xp: 100, points: 30, category: "Bonus", penalty: 5 },
-          { name: "ختم القرأن", xp: 200, points: 30, category: "Bonus", penalty: 5 },
-          { name: "Attend the Weekly meeting", xp: 30, points: 10, category: "Bonus", penalty: 5 },
-          { name: "Quran Exception", xp: 25, points: 5, category: "Task", penalty: 5 },
-          { name: "Book Exception", xp: 25, points: 5, category: "Task", penalty: 5 },
-          { name: "Prayer Exception", xp: 25, points: 5, category: "Task", penalty: 5 },
+          { name: "Book", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7 },
+          { name: "Quran", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7  },
+          { name: "Sport", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 3  },
+          { name: "Prayer At The Mosque", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7  },
+          { name: "listen to quoran", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 2  },
+          { name: "15 Min Improvement", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7  },
+          { name: "Wake up early", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 6  }, 
+          { name: "الشفع و الوتر", xp: 100, points: 40, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 5  },
+          { name: "Presentation", xp: 200, points: 50, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1 },
+          { name: "One day no social Media", xp: 100, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1  },
+          { name: "ختم القرأن", xp: 200, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1 },
+          { name: "Attend the Weekly meeting", xp: 30, points: 10, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1 },
+          { name: "Quran Exception", xp: 25, points: 5, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7  },
+          { name: "Book Exception", xp: 25, points: 5, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7  },
+          { name: "Prayer Exception", xp: 25, points: 5, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7  },
           // Add more tasks as needed
         ],
         completedTasks: [], // Initialize completed tasks as empty

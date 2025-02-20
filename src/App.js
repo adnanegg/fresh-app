@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+// import { useEffect, useState } from "react";
 import { auth } from "./firebase";
-import { onAuthStateChanged } from "firebase/auth";
+// import { onAuthStateChanged } from "firebase/auth";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Signup from "./components/Signup";
-import Home from "./components/Home";
 import Login from "./components/Login";
 import Dashboard from "./components/Dashboard";
 import Profile from "./components/Profile"

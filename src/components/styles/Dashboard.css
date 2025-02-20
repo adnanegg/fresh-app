@@ -170,3 +170,34 @@
   .completed-task-item button:hover {
     background-color: #c82333;
   }
+  .accordion-collapse {
+    overflow: hidden;
+    transition: height 0.3s ease;
+  }
+  
+  .accordion-collapse.collapse {
+    height: 0;
+  }
+  
+  .accordion-collapse.show {
+    height: auto;
+  }
+
+  .level-up-popup {
+    background-color: #4caf50;
+    color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .level-up-title {
+    font-size: 24px;
+    font-weight: bold;
+  }
+  
+  .level-up-confirm-button {
+    background-color: #388e3c;
+    color: white;
+    border-radius: 5px;
+    padding: 10px 20px;
+  }
