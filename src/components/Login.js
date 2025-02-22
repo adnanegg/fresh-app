@@ -18,7 +18,6 @@ const Login = () => {
       alert(error.message);
     }
   };
-  console.log("Firebase API Key:", process.env.REACT_APP_FIREBASE_API_KEY);
   return (
     <div className="login-container">
       <div className="login-card">

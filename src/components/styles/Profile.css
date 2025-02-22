@@ -1,0 +1,310 @@
+/* Profile.css */
+.profile-content {
+  transition: width 0.3s ease;
+}
+
+.profile-content.expanded {
+  width: calc(100% - 250px);
+}
+
+.profile-content:not(.expanded) {
+  width: calc(100% - 70px);
+}
+
+.profile-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.profile-header {
+  background: linear-gradient(135deg, #eeeff0, #00d2ff);
+  padding: 30px;
+  border-radius: 15px 15px 0 0;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.profile-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: white;
+  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.2);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.text-gradient {
+  background: linear-gradient(45deg, #007bff, #00d2ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.profile-rank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rank-icon {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin-bottom: 10px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.rank-name {
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.profile-card {
+  background: white;
+  border-radius: 0 0 15px 15px;
+  padding: 30px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.profile-card:hover {
+  transform: translateY(-5px);
+}
+
+.profile-avatar-section {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.avatar-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.profile-avatar-img {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 5px solid #007bff;
+  box-shadow: 0 5px 15px rgba(0, 123, 255, 0.3);
+  transition: transform 0.3s ease;
+}
+
+.profile-avatar-img:hover {
+  transform: scale(1.05);
+}
+
+.upload-btn {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #007bff;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 123, 255, 0.3);
+}
+
+.upload-btn:hover {
+  background: #0056b3;
+}
+
+.upload-btn i {
+  margin-right: 5px;
+}
+
+#photoUpload {
+  display: none;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+.form-control {
+  border-radius: 10px;
+  border: 1px solid #ced4da;
+  padding: 12px;
+  font-size: 1rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.form-control:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.btn-primary, .btn-danger {
+  border-radius: 25px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: #0056b3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+}
+
+.btn-danger:hover {
+  background: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+/* SweetAlert2 custom styling */
+.swal2-modern {
+  border-radius: 15px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.swal2-modern .swal2-title {
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.swal2-modern .swal2-confirm {
+  background: #007bff;
+  border-radius: 25px;
+  padding: 10px 20px;
+  font-size: 1rem;
+}
+
+.swal2-modern .swal2-confirm:hover {
+  background: #0056b3;
+}
+
+/* Sidebar styles (unchanged, but included for completeness) */
+.sidebar-container {
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  transition: width 0.3s ease;
+}
+
+.sidebar-container:not(.expanded) {
+  width: 70px;
+}
+
+.sidebar-container.expanded {
+  width: 250px;
+}
+
+.sidebar {
+  background-color: #f8f9fa;
+  height: 100%;
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sidebar-header {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.whale-logo {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+}
+
+.expand-toggle {
+  font-size: 16px;
+  padding: 5px;
+}
+
+.sidebar-nav li {
+  list-style: none;
+  width: 100%;
+}
+
+.sidebar-nav li a,
+.sidebar-nav li button {
+  padding: 8px 16px;
+  text-decoration: none;
+  color: #666;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-icon {
+  font-size: 24px;
+  color: #666;
+  margin-right: 8px;
+  transition: color 0.3s ease;
+}
+
+.sidebar-icon:hover {
+  color: #007bff;
+}
+
+.sidebar-text {
+  font-size: 14px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-container.expanded .sidebar-text {
+  opacity: 1;
+}
+
+.sidebar-container:not(.expanded) .sidebar-text {
+  display: none;
+}
+
+.profile-avatar {
+  position: relative;
+  display: inline-block;
+}
+
+.sidebar-profile-icon {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #007bff;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #dc3545;
+  color: white;
+  border-radius: 50%;
+  width: 15px;
+  height: 15px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-content.expanded {
+  width: calc(100% - 250px);
+}
+
+.profile-content:not(.expanded) {
+  width: calc(100% - 70px);
+}

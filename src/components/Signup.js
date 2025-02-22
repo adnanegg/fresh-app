@@ -44,36 +44,50 @@ const Signup = () => {
         xp: { current: 0, level: 1 }, // Initialize XP
         tasks: [
           // Default tasks (replace with your config.tasks)
-          { name: "Book", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 7 },
-          { name: "Quran", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 7  },
-          { name: "Sport", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 3  },
-          { name: "Prayer At The Mosque", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 7  },
-          { name: "listen to quoran", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 2  },
-          { name: "15 Min Improvement", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 7  },
-          { name: "Wake up early", xp: 50, points: 10, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 6  }, 
-          { name: "الشفع و الوتر", xp: 100, points: 40, category: "Bonus", penalty: 5,completionCount: 0,
-            numberLimit: 5  },
-          { name: "Presentation", xp: 200, points: 50, category: "Bonus", penalty: 5,completionCount: 0,
-            numberLimit: 1 },
-          { name: "One day no social Media", xp: 100, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
-            numberLimit: 1  },
-          { name: "ختم القرأن", xp: 200, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
-            numberLimit: 1 },
-          { name: "Attend the Weekly meeting", xp: 30, points: 10, category: "Bonus", penalty: 5,completionCount: 0,
-            numberLimit: 1 },
-          { name: "Quran Exception", xp: 25, points: 5, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 7  },
-          { name: "Book Exception", xp: 25, points: 5, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 7  },
-          { name: "Prayer Exception", xp: 25, points: 5, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 7  },
+          { name: "Book", xp: 500, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7, frequencyUnit: "days", weeklyFrequency: 7 },
+
+          { name: "Quran", xp: 500, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7,frequencyUnit: "days", weeklyFrequency: 7   },
+
+          { name: "Sport", xp: 500, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 3,frequencyUnit: "days", weeklyFrequency: 3   },
+
+          { name: "Prayer At The Mosque", xp: 500, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7,frequencyUnit: "times", requiredCompletions: 7   },
+
+          { name: "listen to quoran", xp: 500, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 2,frequencyUnit: "days", weeklyFrequency: 2    },
+
+          { name: "15 Min Improvement", xp: 500, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7,frequencyUnit: "days", weeklyFrequency: 7   },
+
+          { name: "Wake up early", xp: 500, points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 6,frequencyUnit: "days", weeklyFrequency: 6   }, 
+
+          { name: "الشفع و الوتر", xp: 300, points: 40, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 5,frequencyUnit: "days", weeklyFrequency: 5   },
+
+          { name: "Presentation", xp: 1000, points: 50, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1.,frequencyUnit: "days", weeklyFrequency: 0   },
+
+          { name: "One day no social Media", xp: 1000, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1,frequencyUnit: "days", weeklyFrequency: 1  },
+
+          { name: "ختم القرأن", xp: 2000, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1,frequencyUnit: "days", weeklyFrequency: 1  },
+
+          { name: "Attend the Weekly meeting", xp: 300, points: 10, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1,frequencyUnit: "days", weeklyFrequency: 1   },
+
+          { name: "Quran Exception", xp: 250, points: 5, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7,frequencyUnit: "days", weeklyFrequency: 7   },
+
+          { name: "Book Exception", xp: 250, points: 5, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7,frequencyUnit: "days", weeklyFrequency: 7   },
+
+          { name: "Prayer Exception", xp: 250, points: 5, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 7,frequencyUnit: "times", requiredCompletions: 7 },
           // Add more tasks as needed
         ],
         completedTasks: [], // Initialize completed tasks as empty

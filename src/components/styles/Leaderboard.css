@@ -1,0 +1,154 @@
+/* Leaderboard.css */
+.table {
+    margin-bottom: 0;
+  }
+  
+  .table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+  }
+  
+  .card-header {
+    padding: 1rem;
+  }
+  
+  .card-body {
+    padding: 0;
+  }
+  
+  .table td {
+    vertical-align: middle;
+  }
+  
+  /* Style for top 3 ranks */
+  .table tbody tr:nth-child(1) {
+    background-color: #fff3cd;
+  }
+  
+  .table tbody tr:nth-child(2) {
+    background-color: #e9ecef;
+  }
+  
+  .table tbody tr:nth-child(3) {
+    background-color: #f8edeb;
+  }
+  /* Dashboard.css or Leaderboard.css */
+/* Dashboard.css or Leaderboard.css */
+.sidebar-container {
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    transition: width 0.3s ease;
+  }
+  
+  .sidebar-container:not(.expanded) {
+    width: 70px; /* Narrow width for collapsed state */
+  }
+  
+  .sidebar-container.expanded {
+    width: 250px; /* Expanded width to accommodate text and icons */
+  }
+  
+  .sidebar {
+    background-color: #f8f9fa;
+    height: 100%;
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .sidebar-header {
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .whale-logo {
+    width: 40px; /* Adjust size as needed */
+    height: 40px;
+    margin-bottom: 10px;
+  }
+  
+  .expand-toggle {
+    font-size: 16px;
+    padding: 5px;
+  }
+  
+  .sidebar-nav li {
+    list-style: none;
+    width: 100%;
+  }
+  
+  .sidebar-nav li a,
+  .sidebar-nav li button {
+    padding: 8px 16px;
+    text-decoration: none;
+    color: #666;
+    width: 100%;
+    display: flex;
+    align-items: center;
+  }
+  
+  .sidebar-icon {
+    font-size: 24px; /* Adjust icon size */
+    color: #666; /* Gray color for icons */
+    margin-right: 8px;
+    transition: color 0.3s ease;
+  }
+  
+  .sidebar-icon:hover {
+    color: #007bff; /* Blue color on hover, matching xAI logo */
+  }
+  
+  .sidebar-text {
+    font-size: 14px;
+    white-space: nowrap;
+    opacity: 0; /* Hidden by default in collapsed state */
+    transition: opacity 0.3s ease;
+  }
+  
+  .sidebar-container.expanded .sidebar-text {
+    opacity: 1; /* Visible in expanded state */
+  }
+  
+  .sidebar-container:not(.expanded) .sidebar-text {
+    display: none; /* Ensure text is completely hidden in collapsed state */
+  }
+  
+  .profile-avatar {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .sidebar-profile-icon {
+    width: 40px; /* Adjust size as needed */
+    height: 40px;
+    border: 2px solid #007bff; /* Optional: blue border for profile */
+  }
+  
+  .notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: #dc3545; /* Red for notification */
+    color: white;
+    border-radius: 50%;
+    width: 15px;
+    height: 15px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Adjust main content width based on sidebar state */
+  .dashboard-content.expanded,
+  .col.expanded {
+    width: calc(100% - 250px); /* Match expanded sidebar width */
+  }
+  
+  .dashboard-content:not(.expanded),
+  .col:not(.expanded) {
+    width: calc(100% - 70px); /* Match collapsed sidebar width */
+  }

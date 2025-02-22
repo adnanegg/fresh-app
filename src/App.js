@@ -5,7 +5,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Signup from "./components/Signup";
 import Login from "./components/Login";
 import Dashboard from "./components/Dashboard";
+import Leaderboard from "./components/Leaderboard";
 import Profile from "./components/Profile"
+import Statistics from "./components/Statistics";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 const App = () => {
@@ -22,7 +24,9 @@ const App = () => {
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/statistics" element={<Statistics />} />
       </Routes>
     </Router>
   );
