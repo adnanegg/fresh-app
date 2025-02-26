@@ -174,7 +174,7 @@ const Dashboard = () => {
     };
   
     try {
-      const response = await fetch('https://eu-west1-dashboard-451923.cloudfunctions.net/submitScore', {
+      const response = await fetch('https://europe-west1-dashboard-451923.cloudfunctions.net/submitScore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submissionData),
@@ -240,7 +240,7 @@ const Dashboard = () => {
       transition: "none", // Remove transition since no expansion/contraction
       flex: 1,
     },
-    dashboardCard: { borderRadius: "8px", border: "1px solid #e9ecef", background: "white", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)" },
+    dashboardCard: { borderRadius: "8px", background: "none",border:"none" },
     cardBody: { padding: "12px" },
     cardTitle: { fontSize: "14px", fontWeight: 600 },
     pointsProgress: {
@@ -248,7 +248,7 @@ const Dashboard = () => {
       padding: "15px",
       borderRadius: "8px",
       background: "linear-gradient(135deg, #ff6b6b, #007bff)", // Red to blue gradient
-      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+      // boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
       transition: "background 0.3s ease, transform 0.3s ease",
       position: "relative",
       overflow: "hidden",
@@ -275,17 +275,25 @@ const Dashboard = () => {
       marginBottom: "10px",
       animation: "pulse 2s infinite ease-in-out",
     },
-    sparkEffect: {
-      position: "absolute",
-      top: "-10px",
-      left: "50%",
-      transform: "translateX(-50%)",
-      width: "20px",
-      height: "20px",
-      background: "radial-gradient(circle, rgba(255, 255, 255, 0.8), transparent)",
-      borderRadius: "50%",
-      opacity: 0,
-      animation: "spark 1.5s infinite ease-in-out",
+    
+    
+    videoBackground: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      zIndex: -1,
+    },
+    videoOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      backgroundColor: "rgba(0, 0, 0, 0)", // Transparent to show the video
+      zIndex: 0,
     },
     formSelect: { fontSize: "12px", padding: "4px 8px", borderRadius: "4px", marginBottom: "10px" },
   };
@@ -314,6 +322,17 @@ const Dashboard = () => {
 
   return (
     <div style={styles.containerFluid}>
+      <video
+        autoPlay
+        loop
+        muted
+        style={styles.videoBackground}
+      >
+        <source src="/videos/backvideo2.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+
+      <div style={styles.videoOverlay}></div>
       <style>{stylesString}</style>
       <div style={styles.topBar}>
         <img src="/trackerLogo.png" alt="xAI Logo" style={styles.logo} />

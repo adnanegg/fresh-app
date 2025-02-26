@@ -380,8 +380,7 @@ const NormalMode = () => {
     dashboardCard: {
       borderRadius: "8px",
       border: "1px solid #e9ecef",
-      background: "white",
-      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
+      background: "none",
     },
     cardBody: {
       padding: "12px",
@@ -446,6 +445,24 @@ const NormalMode = () => {
       display: "inline-block",
       paddingLeft: "10px",
     },
+    videoBackground: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      zIndex: -1,
+    },
+    videoOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      backgroundColor: "rgba(0, 0, 0, 0)", // Transparent to show the video
+      zIndex: 0,
+    },
     sidebarProfileIcon: { width: "40px", height: "40px", border: "2px solid #007bff" },
 
   };
@@ -474,6 +491,17 @@ const NormalMode = () => {
 
   return (
     <div style={styles.containerFluid}>
+      <video
+        autoPlay
+        loop
+        muted
+        style={styles.videoBackground}
+      >
+        <source src="/videos/backvideo2.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+
+      <div style={styles.videoOverlay}></div>
       <style>{stylesString}</style>
       <div style={styles.topBar}>
         <img src="/trackerLogo.png" alt="xAI Logo" style={styles.logo} />

@@ -108,18 +108,18 @@ const Signup = () => {
           {taskId:"improvement", name: "15 Min Improvement", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10,completionCount: 0,
     },
 
-          {taskId:"Wake_up_early" ,name: "Wake up early", xp: 500, points: 10, category: "Task", completionCount: 0, }, 
+          {taskId:"Wake_up_early" ,name: "Wake up early", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, completionCount: 0, }, 
 
-          {taskId:"chaf3_watr", name: "الشفع و الوتر", xp: 300, points: 40, category: "Bonus", completionCount: 0,
+          { name: "الشفع و الوتر", xp: 300, points: 40, category: "Bonus"
            },
 
-          {taskId:"presentation" ,name: "Presentation", xp: 1000, points: 50, category: "Bonus", penalty: 5,completionCount: 0,
+          {name: "Presentation", xp: 1000, points: 50, category: "Bonus", penalty: 5,completionCount: 0,
             },
 
           {taskId:"One_day_no_social_media", name: "One day no social Media", xp: 1000, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
            },
 
-          {taskId:"5atm_9or2an", name: "ختم القرأن", xp: 2000, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
+          { name: "ختم القرأن", xp: 2000, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
           },
 
           {taskId:"Attend_the_weekly_meeting" ,name: "Attend the Weekly meeting", xp: 300, points: 10, category: "Bonus", penalty: 5,completionCount: 0, },
@@ -137,6 +137,24 @@ const Signup = () => {
 
   return (
     <div className="signup-container">
+      <video
+        autoPlay
+        loop
+        muted
+        className="video-background"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          zIndex: -1,
+        }}
+      >
+        <source src="/videos/backvideo.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
     <div className="signup-card">
       <h2>Sign Up</h2>
       <form onSubmit={handleSignup}>

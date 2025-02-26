@@ -2,12 +2,19 @@ const functions = require('@google-cloud/functions-framework');
 const { google } = require('googleapis');
 
 functions.http('submitScore', async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*'); // Enable CORS
-  res.set('Access-Control-Allow-Methods', 'POST');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  // Set CORS headers for all responses
+  res.set('Access-Control-Allow-Origin', '*'); // Allow all origins (or specify your frontend URL)
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS'); // Allow POST and OPTIONS
+  res.set('Access-Control-Allow-Headers', 'Content-Type'); // Allow Content-Type header
 
+  // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    return res.status(204).send('');
+    return res.status(204).send(''); // No content for preflight
+  }
+
+  // Only proceed for POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const auth = new google.auth.GoogleAuth({
@@ -17,7 +24,6 @@ functions.http('submitScore', async (req, res) => {
   const sheets = google.sheets({ version: 'v4', auth });
 
   const { timestamp, type, nickname, score, message } = req.body;
-
   try {
     await sheets.spreadsheets.values.append({
       spreadsheetId: '1GBaiL1LooacoktkqJTSK6t6pd2hhOMbZPnxySi_XVfQ',
