@@ -1,0 +1,262 @@
+/* RankedMode.css */
+
+/* Video background */
+.video-background {
+  min-width: 100%;
+  min-height: 100%;
+  width: auto;
+  height: auto;
+}
+
+/* Container and layout */
+.container-fluid {
+  padding: 0;
+}
+
+/* Top bar styles */
+.topBar {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  height: 60px;
+  background-color: #ffc107;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Logo */
+.logo {
+  width: 40px;
+  height: 40px;
+  margin-right: 10px;
+}
+
+/* Top bar links */
+.topBarLink {
+  text-decoration: none;
+  color: #666;
+  font-size: 16px;
+  padding: 0 15px;
+  display: flex;
+  align-items: center;
+  transition: color 0.3s ease;
+}
+
+.topBarLink:hover {
+  color: #007bff;
+}
+
+.topBarIcon {
+  font-size: 20px;
+  margin-right: 8px;
+  color: #666;
+  transition: color 0.3s ease;
+}
+
+.topBarIcon:hover {
+  color: #007bff;
+}
+
+/* Profile avatar in top bar */
+.profileAvatar {
+  position: relative;
+  display: inline-block;
+  padding-left: 10px;
+}
+
+.sidebarProfileIcon {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #007bff;
+}
+
+/* Main content */
+.dashboard-content {
+  margin-top: 60px; /* Space for the top bar */
+  padding: 10px;
+}
+
+/* Cards */
+.dashboard-card {
+  background-color: transparent; /* Default transparent for base styling */
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Specific section backgrounds */
+.profile-rank-card {
+  background-color: rgba(13, 53, 51, 0.3); /* Teal/Cyan (semi-transparent, matches video glow) */
+}
+
+.xp-bar-card {
+  background-color: rgba(192, 192, 192, 0.3); /* Silver (semi-transparent) */
+}
+
+.boost-card {
+  background-color: rgba(205, 127, 50, 0.3); /* Bronze (semi-transparent) */
+}
+
+.tasks-card {
+  background-color: rgba(255, 215, 0, 0.3); /* Gold (semi-transparent, matches video glow) */
+}
+
+/* Leaderboard specific styles */
+.leaderboard {
+  max-height: 100%; /* Full height of the column */
+  overflow-y: auto; /* Scroll if content exceeds height */
+  border: none;
+}
+
+.leaderboard .table {
+  background-color: transparent; /* Ensure transparency */
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.leaderboard .table th,
+.leaderboard .table td {
+  padding: 6px;
+}
+
+.leaderboard .table th {
+  background-color: #007bff; /* Blue header */
+  font-weight: bold;
+}
+
+.leaderboard .table tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.1); /* Light stripe for readability */
+}
+
+.leaderboard .table tr:nth-child(odd) {
+  background-color: transparent; /* Transparent for odd rows */
+}
+
+/* Top three positions in leaderboard */
+.leaderboard-rank-1 {
+  background-color: rgba(255, 215, 0, 0.3); /* Gold (semi-transparent) */
+}
+
+.leaderboard-rank-2 {
+  background-color: rgba(192, 192, 192, 0.3); /* Silver (semi-transparent) */
+}
+
+.leaderboard-rank-3 {
+  background-color: rgba(205, 127, 50, 0.3); /* Bronze (semi-transparent) */
+}
+
+.leaderboard-default {
+  background-color: rgba(0, 0, 139, 0.3); /* Deep Blue (semi-transparent, for 4th+ positions) */
+}
+
+.leaderboard img {
+  width: 30px;
+  height: 30px;
+  object-fit: cover;
+}
+
+/* Progress bars */
+.progress {
+  background-color: rgba(255, 255, 255, 0.3); /* Slightly visible */
+  height: 6px;
+}
+
+/* Text and typography */
+.card-title {
+  color: #006511;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  font-size: 1rem;
+}
+
+.card-text,
+.text-muted,
+.text-dark,
+.form-label {
+  font-size: 0.8rem;
+  color: green;
+}
+
+/* Accordion */
+.accordion-item {
+  background-color: transparent;
+  border: none;
+}
+
+.accordion-button {
+  background-color: blue;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  font-size: 0.9rem;
+  padding: 8px;
+}
+
+.accordion-button:not(.collapsed) {
+  background-color: blue;
+}
+
+.accordion-body {
+  background-color: transparent;
+  padding: 5px;
+}
+
+/* List group */
+.list-group-item {
+  background-color: transparent;
+  border: none;
+  color: red;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+/* Buttons */
+.btn {
+  color: #fff;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+}
+
+/* Custom "+" button */
+.btn-plus {
+  background-color: #28a745; /* Green background */
+  color: #fff;
+  border: none;
+  border-radius: 50%; /* Circular shape */
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  padding: 0;
+  transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+}
+
+.btn-plus:hover {
+  background-color: #218838; /* Darker green on hover */
+  transform: scale(1.1); /* Slight scale-up effect */
+}
+
+/* Boost badge */
+.boost-badge {
+  background-color: rgba(255, 255, 0, 0.5); /* Yellow semi-transparent */
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  color: #000;
+}
+
+.boost-name {
+  margin-left: 4px;
+}
+
+/* Task notification */
+.task-notification {
+  position: absolute;
+  top: -20px;
+  right: 0;
+  font-size: 12px;
+  color: #28a745;
+  font-weight: bold;
+}

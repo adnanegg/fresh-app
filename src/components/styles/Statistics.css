@@ -1,160 +1,44 @@
 /* Statistics.css */
 .statistics-content {
-    transition: width 0.3s ease;
-  }
-  
-  .statistics-content.expanded {
-    width: calc(100% - 250px);
-  }
-  
-  .statistics-content:not(.expanded) {
-    width: calc(100% - 60px);
-  }
-  
-  .chart-container {
-    position: relative;
-    margin: auto;
-    width: 100%;
-  }
-  
-  .report-section {
-    max-height: 300px;
-    overflow-y: auto;
-    font-size: 12px;
-  }
-  
-  .form-select-sm {
-    font-size: 12px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    width: 120px; /* Match the inline style for consistency */
-  }
-  
-  /* Sidebar styles (unchanged, included for completeness) */
-  .sidebar-container {
-    height: 100vh;
-    position: sticky;
-    top: 0;
-    transition: width 0.3s ease;
-  }
-  
-  .sidebar-container:not(.expanded) {
-    width: 60px;
-  }
-  
-  .sidebar-container.expanded {
-    width: 250px;
-  }
-  
-  .sidebar {
-    background-color: #f8f9fa;
-    height: 100%;
-    padding: 20px 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .sidebar-header {
-    margin-bottom: 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .whale-logo {
-    width: 40px;
-    height: 40px;
-    margin-bottom: 10px;
-  }
-  
-  .expand-toggle {
-    font-size: 16px;
-    padding: 5px;
-  }
-  
-  .sidebar-nav li {
-    list-style: none;
-    width: 100%;
-  }
-  
-  .sidebar-nav li a,
-  .sidebar-nav li button {
-    padding: 8px 16px;
-    text-decoration: none;
-    color: #666;
-    width: 100%;
-    display: flex;
-    align-items: center;
-  }
-  
-  .sidebar-icon {
-    font-size: 20px;
-    color: #666;
-    margin-right: 8px;
-    transition: color 0.3s ease;
-  }
-  
-  .sidebar-icon:hover {
-    color: #007bff;
-  }
-  
-  .sidebar-text {
-    font-size: 14px;
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  
-  .sidebar-container.expanded .sidebar-text {
-    opacity: 1;
-  }
-  
-  .sidebar-container:not(.expanded) .sidebar-text {
-    display: none;
-  }
-  
-  .sidebar-section {
-    width: 100%;
-  }
-  
-  .sidebar-section-title {
-    font-size: 12px;
-    color: #666;
-    text-transform: uppercase;
-    margin: 10px 0 5px 16px;
-    font-weight: 600;
-  }
-  
-  .profile-avatar {
-    position: relative;
-    display: inline-block;
-  }
-  
-  .sidebar-profile-icon {
-    width: 40px;
-    height: 40px;
-    border: 2px solid #007bff;
-  }
-  
-  .notification-badge {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    background-color: #dc3545;
-    color: white;
-    border-radius: 50%;
-    width: 15px;
-    height: 15px;
-    font-size: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .dashboard-card {
-    border-radius: 8px;
-    border: 1px solid #e9ecef;
-    background: white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  }
+  transition: width 0.3s ease;
+}
+
+.statistics-content.expanded {
+  width: calc(100% - 250px);
+}
+
+.statistics-content:not(.expanded) {
+  width: calc(100% - 60px);
+}
+
+.chart-container {
+  position: relative;
+  margin: auto;
+  width: 100%;
+}
+
+.report-section {
+  max-height: 300px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.form-select-sm {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: 120px; /* Match the inline style for consistency */
+}
+
+
+
+
+
+
+
+.dashboard-card {
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  background: transparent;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}

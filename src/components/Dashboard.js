@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { auth, database } from "../firebase";
 import { signOut } from "firebase/auth";
-import { useNavigate,Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { ref, onValue, update } from "firebase/database";
 import Swal from "sweetalert2";
-import "./styles/Dashboard.css";
+// import "./styles/Dashboard.css"; // Reuse Dashboard styling
 import "./styles/style.css";
-import "bootstrap/dist/css/bootstrap.min.css"; // Import Bootstrap CSS
-import "bootstrap-icons/font/bootstrap-icons.css"; // Import Bootstrap Icons (optional)
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap-icons/font/bootstrap-icons.css";
 
 // Ranking configuration
 const rankingConfig = {
-  thresholds: [20000, 100000, 300000, 500000, 1000000], // XP thresholds for each rank
-  ranks: ["Warrior", "Master", "Grand Master", "Legend", "Mythic"], // Rank names
+  thresholds: [20000, 100000, 300000, 500000, 1000000],
+  ranks: ["Warrior", "Master", "Grand Master", "Legend", "Mythic"],
   images: [
     "ranking-images/rank-warrior.png",
     "ranking-images/rank-master.png",
@@ -26,18 +26,7 @@ const rankingConfig = {
     "Grand Master achieved! You wield power and wisdom like a true champion!",
     "Legend mode: activated! Your deeds are etched into the chronicles of greatness!",
     "Mythic rank reached! You've become a living legend—an icon of the ages!"
-  ], // Rank images
-};
-
-// Configurable bonus values
-const BONUS_POINTS = 10; // Default bonus points (configurable)
-const BONUS_XP = 500; // Default bonus XP (configurable)
-
-// Define boost types and their effects
-const BOOSTS = {
-  "5xBonus": { multiplier: 5, type: "bonus", description: "Multiplies bonus XP and points by 5 when reaching completion limit" },
-  "DoubleEverything": { multiplier: 2, type: "all", description: "Doubles XP, points, and bonuses for this task" },
-  "+30Percent": { percentage: 0.3, type: "all", description: "Increases XP, points, and bonuses by 30% for this task" },
+  ],
 };
 
 const Dashboard = () => {
@@ -45,886 +34,482 @@ const Dashboard = () => {
   const [userProfile, setUserProfile] = useState({
     name: "User",
     photo: "profile-images/default-profile.png",
-    rankName: "Warrior", rankImage: "ranking-images/rank-warrior.png"
+    rankName: "Warrior",
+    rankImage: "ranking-images/rank-warrior.png"
   });
-  const [tasks, setTasks] = useState([]);
-  const [completedTasks, setCompletedTasks] = useState([]);
   const [xpData, setXpData] = useState({ current: 0, level: 1 });
   const [pointsData, setPointsData] = useState({ current: 0, total: 900 });
   const [MpointsData, setMpointsData] = useState({ current: 0, total: 3000 });
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false); // New state for sidebar expansion
-  const [notifications, setNotifications] = useState([]); // State for task completion notifications
+  const [hasStartedRanked, setHasStartedRanked] = useState(false); // Track if user started Ranked Mode
+  const [isLoading, setIsLoading] = useState(true); // Add isLoading state
+  const [formType, setFormType] = useState("weekly"); // "weekly" or "monthly"
+  const [formData, setFormData] = useState({
+    nickname: "",
+    message: ""
+  });
 
-  // Check if the user is authenticated
+  // Check if the user is authenticated and fetch data
   useEffect(() => {
+    let unsubscribe;
+
     const fetchUserData = async (userId) => {
+      setIsLoading(true); // Start loading
       const userRef = ref(database, `users/${userId}`);
-      onValue(userRef, async (snapshot) => {
+      unsubscribe = onValue(userRef, async (snapshot) => {
         const data = snapshot.val();
         if (data) {
-     
-            setUserProfile(data.profile || { name: "User", photo: "/profile-photos/default-profile.png" });
-            setTasks(data.tasks || []);
-            setCompletedTasks(data.completedTasks || []);
-            setXpData(data.xp || { current: 0, level: 1 });
-            setPointsData(data.points || { current: 0, total: 900 });
-            setMpointsData(data.Mpoints || { current: 0, total: 3000 });
+          setUserProfile(data.profile || { name: "User", photo: "/profile-photos/default-profile.png" });
+          setXpData(data.xp || { current: 0, level: 1 });
+          setPointsData(data.points || { current: 0, total: 900 });
+          setMpointsData(data.Mpoints || { current: 0, total: 3000 });
+          setFormData(prev => ({ ...prev, nickname: data.profile?.name || "" }));
+          setHasStartedRanked(data.hasStartedRanked || false); // Fetch hasStartedRanked from Firebase
 
-           // Update rank based on XP
-    // Update rank based on XP
-const userXp = data.xp?.current || 0;
-const currentLevel = data.xp?.level || 1;
-const currentThreshold = rankingConfig.thresholds[currentLevel - 1] || 100; // Get the current threshold
+          const userXp = data.xp?.current || 0;
+          const currentLevel = data.xp?.level || 1;
 
-// Check if the user has leveled up
-if (userXp >= currentThreshold) {
-    const newLevel = currentLevel + 1; // Increment the level
-    const newRankIndex = rankingConfig.thresholds.findIndex((threshold) => userXp < threshold);
+          if (hasStartedRanked && userXp >= (rankingConfig.thresholds[currentLevel - 1] || 100)) {
+            const newLevel = currentLevel + 1;
+            const newRankIndex = rankingConfig.thresholds.findIndex((threshold) => userXp < threshold);
 
-    if (newRankIndex !== -1) {
-        // Normal rank advancement
-        const newRank = rankingConfig.ranks[newRankIndex];
-        const newRankImage = rankingConfig.images[newRankIndex];
+            if (newRankIndex !== -1) {
+              const newRank = rankingConfig.ranks[newRankIndex];
+              const newRankImage = rankingConfig.images[newRankIndex];
 
-        await update(userRef, {
-            "profile/rankName": newRank,
-            "profile/rankImage": newRankImage,
-            "xp/level": newLevel,
-            "xp/current": userXp - currentThreshold, // XP reset to the remaining amount after leveling up
-        });
+              await update(userRef, {
+                "profile/rankName": newRank,
+                "profile/rankImage": newRankImage,
+                "xp/level": newLevel,
+                "xp/current": userXp - rankingConfig.thresholds[currentLevel - 1],
+              });
 
-        // Show a level-up message
-        Swal.fire({
-            title: "Level Up!",
-            text: rankingConfig.levelUpMessages[newRankIndex] || "You've leveled up!",
-            icon: "success",
-            confirmButtonText: "OK",
-            customClass: {
-                popup: "level-up-popup",
-                title: "level-up-title",
-                confirmButton: "level-up-confirm-button",
-            },
-        });
-      
-    } else {
-        // User is at the highest rank ("Mythic")
-        await update(userRef, {
-            "profile/rankName": rankingConfig.ranks[rankingConfig.ranks.length - 1],
-            "profile/rankImage": rankingConfig.images[rankingConfig.images.length - 1],
-            "xp/level": currentLevel, // Keep the current level as the max
-            "xp/current": userXp, // Continue accumulating XP indefinitely
-        });
-    }
-  }
-
-} 
-});
-        } 
-      const unsubscribe = auth.onAuthStateChanged((user) => {
-        if (!user) {
-          navigate("/login");
-        } else {
-          fetchUserData(user.uid);
+              Swal.fire({
+                title: "Level Up!",
+                text: rankingConfig.levelUpMessages[newRankIndex] || "You've leveled up!",
+                icon: "success",
+                confirmButtonText: "OK",
+              });
+            }
+          }
         }
+        setIsLoading(false); // End loading
+      }, (error) => {
+        console.error("Firebase error:", error);
+        setIsLoading(false); // End loading on error
       });
-  
-      return () => unsubscribe();
-}, [navigate]);
+    };
 
-   // Calculate XP percentage and threshold
-   const calculateXpProgress = () => {
-    const currentLevel = xpData.level - 1; // Levels start from 1, but thresholds are 0-indexed
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        navigate("/login");
+      } else {
+        fetchUserData(user.uid);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe(); // Clean up Firebase listener
+      if (unsubscribeAuth) unsubscribeAuth(); // Clean up auth listener
+    };
+  }, [navigate]);
+
+  // Calculate XP progress only if user has started Ranked Mode
+  const calculateXpProgress = useCallback(() => {
+    if (!hasStartedRanked) return { xpPercentage: 0, currentThreshold: 0 };
+    const currentLevel = xpData.level - 1;
     const currentThreshold = rankingConfig.thresholds[currentLevel] || 100;
     const xpPercentage = (xpData.current / currentThreshold) * 100;
+    return { xpPercentage, currentThreshold };
+  }, [xpData, hasStartedRanked]);
 
-    return { xpPercentage, currentThreshold};
-  };
+  const { xpPercentage, currentThreshold } = calculateXpProgress();
 
-  const { xpPercentage, currentThreshold} = calculateXpProgress();
-
-  
-  
-
-  
-  
- 
-  // Group tasks by category
-  const groupTasksByCategory = (tasks) => {
-    return tasks.reduce((acc, task) => {
-      if (!acc[task.category]) {
-        acc[task.category] = [];
-      }
-      acc[task.category].push(task);
-      return acc;
-    }, {});
-  };
-  const [openSections, setOpenSections] = useState({});
-  const [selectedTaskIndex, setSelectedTaskIndex] = useState(null);
-  const [selectedBoost, setSelectedBoost] = useState(null);
-  const groupedTasks = groupTasksByCategory(tasks);
-// Initialize accordion sections when tasks load
-useEffect(() => {
-  const initialSections = Object.keys(groupedTasks).reduce((acc, category) => ({
-    ...acc,
-    [category]: category === "Task" // Only "Task" open by default
-  }), {});
-  setOpenSections(initialSections);
-}, [tasks]);
-
-const toggleSidebar = () => {
-  setIsSidebarExpanded(!isSidebarExpanded);
-};
-// Toggle accordion sections
-const toggleSection = (category) => {
-  setOpenSections((prev) => ({
-    ...prev,
-    [category]: !prev[category],
-  }));
-};
-
-// **NEW: Function to apply a boost to a selected task**
-const applyBoost = async () => {
-  if (!selectedTaskIndex || !selectedBoost) {
-    Swal.fire({
-      icon: "warning",
-      title: "Select Task and Boost",
-      text: "Please select a task and a boost to apply.",
-      confirmButtonText: "OK",
-    });
-    return;
-  }
-
-  const task = tasks[selectedTaskIndex];
-  if (task.boost) {
-    Swal.fire({
-      icon: "warning",
-      title: "Boost Already Applied",
-      text: `A boost (${task.boost}) is already applied to "${task.name}". Remove it first.`,
-      confirmButtonText: "OK",
-    });
-    return;
-  }
-
-  const result = await Swal.fire({
-    title: `Apply ${BOOSTS[selectedBoost].name}?`,
-    text: BOOSTS[selectedBoost].description,
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonText: "Apply",
-    cancelButtonText: "Cancel",
-  });
-
-  if (result.isConfirmed) {
-    const updatedTasks = [...tasks];
-    updatedTasks[selectedTaskIndex] = { ...task, boost: selectedBoost };
-
-    const userId = auth.currentUser?.uid;
-    const userRef = ref(database, `users/${userId}`);
-    await update(userRef, {
-      tasks: updatedTasks,
-    });
-
-    setTasks(updatedTasks);
-    setSelectedTaskIndex(null);
-    setSelectedBoost(null);
-  }
-};
-
-const removeBoost = async (taskIndex) => {
-  const task = tasks[taskIndex];
-  if (!task.boost) {
-    Swal.fire({
-      icon: "warning",
-      title: "No Boost Applied",
-      text: `No boost is applied to "${task.name}".`,
-      confirmButtonText: "OK",
-    });
-    return;
-  }
-
-  const result = await Swal.fire({
-    title: "Remove Boost?",
-    text: `Are you sure you want to remove the ${BOOSTS[task.boost].name} from "${task.name}"?`,
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonText: "Remove",
-    cancelButtonText: "Cancel",
-  });
-
-  if (result.isConfirmed) {
-    const updatedTasks = [...tasks];
-    updatedTasks[taskIndex] = { ...task, boost: null };
-
-    const userId = auth.currentUser?.uid;
-    const userRef = ref(database, `users/${userId}`);
-    await update(userRef, {
-      tasks: updatedTasks,
-    });
-
-    setTasks(updatedTasks);
-  }
-};
-
-  
-  const completeTask = async (index) => {
-    const task = tasks[index];
-  
-    // Ensure completionCount is a valid number
-    if (typeof task.completionCount !== "number" || isNaN(task.completionCount)) {
-      task.completionCount = 0; // Initialize to 0 if invalid
-    }
-  
-    // Check if the task has reached its completion limit
-    if (task.completionCount >= task.numberLimit) {
-      Swal.fire({
-        icon: "warning",
-        title: "Task Limit Reached",
-        text: `You have completed "${task.name}" the maximum number of times.`,
-        confirmButtonText: "OK",
-      });
-      return;
-    }
-  
-    // Increment completionCount
-    const updatedTask = { ...task, completionCount: task.completionCount + 1 };
-  
-    // Update the tasks list
-    const newTasks = [...tasks];
-    newTasks[index] = updatedTask;
-  
-    // Add the task to completedTasks (only if it's not already there)
-    const existingCompletedTaskIndex = completedTasks.findIndex((t) => t.name === task.name);
-    let newCompletedTasks = [...completedTasks];
-  
-    if (existingCompletedTaskIndex === -1) {
-      // Task is not in completedTasks, add it with a count of 1
-      newCompletedTasks.push({ ...task, completionCount: 1 });
-    } else {
-      // Task is already in completedTasks, increment its completionCount
-      const existingTask = newCompletedTasks[existingCompletedTaskIndex];
-      newCompletedTasks[existingCompletedTaskIndex] = {
-        ...existingTask,
-        completionCount: existingTask.completionCount + 1,
-        
-      };
-    }
-    // Calculate bonuses if completionLimit is reached
-    let bonusPoints = 0;
-    let bonusXp = 0;
-    let baseXp = task.xp;
-    let basePoints = task.points;
-
-    if (updatedTask.boost) {
-      const boost = BOOSTS[updatedTask.boost];
-      if (boost.type === "all") {
-        if (boost.multiplier) {
-          baseXp *= boost.multiplier;
-          basePoints *= boost.multiplier;
-          if (updatedTask.completionCount === updatedTask.numberLimit) {
-            bonusXp = BONUS_XP * boost.multiplier;
-            bonusPoints = BONUS_POINTS * boost.multiplier;
-          }
-        } else if (boost.percentage) {
-          baseXp *= (1 + boost.percentage);
-          basePoints *= (1 + boost.percentage);
-          if (updatedTask.completionCount === updatedTask.numberLimit) {
-            bonusXp = BONUS_XP * (1 + boost.percentage);
-            bonusPoints = BONUS_POINTS * (1 + boost.percentage);
-          }
-        }
-      } else if (boost.type === "bonus" && updatedTask.completionCount === updatedTask.numberLimit) {
-        bonusXp = BONUS_XP * boost.multiplier;
-        bonusPoints = BONUS_POINTS * boost.multiplier;
-      }
-    }
-
-    if (updatedTask.completionCount === updatedTask.numberLimit) {
-      bonusPoints = BONUS_POINTS;
-      bonusXp = BONUS_XP;
-
-    if (bonusPoints > 0 || bonusXp > 0) {
-        setNotifications((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            taskName: task.name,
-            points: bonusPoints,
-            xp: bonusXp,
-            position: `task-${index}`,
-          },
-        ]);}
-      // Show notification for bonus
-      setNotifications((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          taskName: task.name,
-          points: bonusPoints,
-          xp: bonusXp,
-          position: `task-${index}`, // Unique identifier for positioning
-        },
-      ]);
-
-      // Auto-remove notification after 3 seconds
-      setTimeout(() => {
-        setNotifications((prev) => prev.filter((n) => n.id !== Date.now()));
-      }, 3000);
-    }
-  
-    // Update XP, points, and Mpoints
-    const newXpData = { ...xpData, current: xpData.current + task.xp + bonusXp };
-    const newPointsData = { ...pointsData, current: pointsData.current + task.points + bonusPoints };
-    const newMpointsData = { ...MpointsData, current: MpointsData.current + task.points + bonusPoints };
-    // Update Firebase Realtime Database
-    const userId = auth.currentUser?.uid;
-    const userRef = ref(database, `users/${userId}`);
-    const now = new Date();
-    const dateStr = now.toISOString().split("T")[0];
-
-  // **NEW: Update taskHistory for both frequency units**
-    const taskHistoryRef = ref(database, `users/${userId}/taskHistory/${dateStr}`);
-    onValue(taskHistoryRef, (snapshot) => {
-      const history = snapshot.val() || {};
-      let updatedHistory = { ...history };
-
-      if (task.frequencyUnit === "days") {
-        updatedHistory[task.name] = { completed: true };
-      } else if (task.frequencyUnit === "times") {
-        updatedHistory[task.name] = { 
-          completions: (history[task.name]?.completions || 0) + 1 
-        };
-      }
-
-          update(taskHistoryRef, updatedHistory);
-      },{ onlyOnce: true });
-
-    await update(userRef, {
-      tasks: newTasks,
-      completedTasks: newCompletedTasks,
-      xp: newXpData,
-      points: newPointsData,
-      Mpoints: newMpointsData,
-    });
-  
-    
-  };
-
-
-
-  const undoTask = async (index) => {
-    const task = completedTasks[index];
-  
-    // Find the task in the tasks list
-    const taskIndex = tasks.findIndex((t) => t.name === task.name);
-    if (taskIndex !== -1) {
-      const currentTask = tasks[taskIndex];
-      
-      // Ensure completionCount is a valid number and does not go below 0
-      const updatedCompletionCount = Math.max(currentTask.completionCount -task.completionCount, 0);
-      const updatedTask = { ...currentTask, completionCount: updatedCompletionCount };
-      
-      // Update the tasks list
-      const newTasks = [...tasks];
-      newTasks[taskIndex] = updatedTask;
-      // Remove the task from completedTasks
-      const newCompletedTasks = completedTasks.filter((_, i) => i !== index);
-  
-      // Update XP, points, and Mpoints
-      const newXp = Math.max(xpData.current - (task.xp * task.completionCount), 0);
-      const newPoints = Math.max(pointsData.current - (task.points * task.completionCount), 0);
-      const newMpoints = Math.max(MpointsData.current - (task.points * task.completionCount), 0);
-  
-      const newXpData = { ...xpData, current: newXp };
-      const newPointsData = { ...pointsData, current: newPoints };
-      const newMpointsData = { ...MpointsData, current: newMpoints };
-  
-      // Update Firebase Realtime Database
-      const userId = auth.currentUser?.uid;
-      const userRef = ref(database, `users/${userId}`);
-      await update(userRef, {
-        tasks: newTasks,
-        completedTasks: newCompletedTasks,
-        xp: newXpData,
-        points: newPointsData,
-        Mpoints: newMpointsData,
-      });
-    }
-  };
-  const resetTaskCompletionCount = async (index) => {
-    const task = tasks[index];
-  
-    // Reset completionCount to 0
-    const updatedTask = { ...task, completionCount: 0 };
-  
-    // Update the tasks list
-    const newTasks = [...tasks];
-    newTasks[index] = updatedTask;
-  
-    // Update Firebase Realtime Database
-    const userId = auth.currentUser?.uid;
-    const userRef = ref(database, `users/${userId}`);
-    await update(userRef, {
-      tasks: newTasks,
-    });
-  
-    Swal.fire({
-      icon: "success",
-      title: "Task Reset",
-      text: `"${task.name}" has been reset. You can now complete it again.`,
-      confirmButtonText: "OK",
-    });
-  };
-  const resetCompletedTasks = async () => {
-    const userId = auth.currentUser?.uid;
-    if (!userId) return;
-  
-    // Reset completionCount for all tasks to 0
-    const updatedTasks = tasks.map((task) => ({
-      ...task,
-      completionCount: 0,
-    }));
-  
-    // Clear the completedTasks array
-    const newCompletedTasks = [];
-  
-    // Update Firebase Realtime Database
-    const userRef = ref(database, `users/${userId}`);
-    await update(userRef, {
-      tasks: updatedTasks,
-      completedTasks: newCompletedTasks,
-    });
-  
-    // Show a success message
-    Swal.fire({
-      icon: "success",
-      title: "Tasks Reset!",
-      text: "All completed tasks have been reset.",
-      confirmButtonText: "OK",
-    });
-  };
-
-  // Reset points bar
-  const resetPointsBar = () => {
+  const resetPointsBar = useCallback(() => {
     const newPointsData = { current: 0, total: 900 };
-
-    // Update Firebase Realtime Database
     const userId = auth.currentUser?.uid;
-    const userRef = ref(database, `users/${userId}`);
-    update(userRef, {
-      points: newPointsData,
-    });
-
+    if (userId) {
+      const userRef = ref(database, `users/${userId}`);
+      update(userRef, { points: newPointsData });
+    }
     Swal.fire({
       icon: "success",
       title: "Points Bar Reset!",
       text: "The points bar has been reset to 0.",
-      confirmButtonText: "OK",
     });
-  };
+  }, []);
 
-  // Reset monthly points bar
-  const resetMonthlyPointsBar = () => {
+  const resetMonthlyPointsBar = useCallback(() => {
     const newMpointsData = { current: 0, total: 3000 };
-
-    // Update Firebase Realtime Database
     const userId = auth.currentUser?.uid;
-    const userRef = ref(database, `users/${userId}`);
-    update(userRef, {
-      Mpoints: newMpointsData,
-    });
-
+    if (userId) {
+      const userRef = ref(database, `users/${userId}`);
+      update(userRef, { Mpoints: newMpointsData });
+    }
     Swal.fire({
       icon: "success",
       title: "Monthly Points Bar Reset!",
       text: "The Monthly points bar has been reset to 0.",
-      confirmButtonText: "OK",
     });
-  };
+  }, []);
 
-   // Handle logout
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await signOut(auth);
     navigate("/signup");
+  }, [navigate]);
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
- 
-    return (
-      <div className="container-fluid">
-      <div className="row">
-        {/* Sidebar */}
-        <div className={`col-auto p-0 sidebar-container ${isSidebarExpanded ? 'expanded' : ''}`}>
-          <div className="sidebar">
-            <div className="sidebar-header">
-              <img src="/trackerLogo.png" alt="xAI Logo" className="whale-logo" />
-              <button
-                onClick={toggleSidebar}
-                className="btn btn-link text-dark expand-toggle p-0"
-                aria-label={isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
-              >
-                <i className={`bi ${isSidebarExpanded ? 'bi-chevron-left' : 'bi-chevron-right'}`}></i>
-              </button>
-            </div>
-            <ul className="sidebar-nav list-unstyled d-flex flex-column align-items-start">
-              <li className="mb-3 w-100">
-                <Link to="/dashboard" className={`text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'}`}>
-                  <i className="bi bi-house-fill sidebar-icon me-2"></i>
-                  {isSidebarExpanded && <span className="sidebar-text">Home</span>}
-                </Link>
-              </li>
-              <li className="mb-3 w-100">
-                <Link to="/leaderboard" className={`text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'}`}>
-                  <i className="bi bi-trophy-fill sidebar-icon me-2"></i>
-                  {isSidebarExpanded && <span className="sidebar-text">Leaderboard</span>}
-                </Link>
-              </li>
-              <li className="mb-3 w-100">
-                <Link to="/profile" className={`text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'}`}>
-                  <i className="bi bi-person-fill sidebar-icon me-2"></i>
-                  {isSidebarExpanded && <span className="sidebar-text">Profile</span>}
-                </Link>
-              </li>
-              <li className="mb-3 w-100">
-                <Link to="/statistics" className={`text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'}`}>
-                  <i className="bi bi-bar-chart-fill sidebar-icon me-2"></i>
-                  {isSidebarExpanded && <span className="sidebar-text">Statistics</span>}
-                </Link>
-              </li>
-              <li className="sidebar-section mb-3">
-                {isSidebarExpanded && <h6 className="sidebar-section-title">Settings</h6>}
-                <ul className="list-unstyled">
-                  <li className="mb-2 w-100">
-                    <button
-                      onClick={resetCompletedTasks}
-                      className={`btn btn-link text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'} p-0`}
-                    >
-                      <i className="bi bi-arrow-repeat-fill sidebar-icon me-2"></i>
-                      {isSidebarExpanded && <span className="sidebar-text">Reset Completed Tasks</span>}
-                    </button>
-                  </li>
-                  <li className="mb-2 w-100">
-                    <button
-                      onClick={resetPointsBar}
-                      className={`btn btn-link text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'} p-0`}
-                    >
-                      <i className="bi bi-bar-chart-fill sidebar-icon me-2"></i>
-                      {isSidebarExpanded && <span className="sidebar-text">Reset Points Bar</span>}
-                    </button>
-                  </li>
-                  <li className="mb-2 w-100">
-                    <button
-                      onClick={resetMonthlyPointsBar}
-                      className={`btn btn-link text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'} p-0`}
-                    >
-                      <i className="bi bi-calendar-fill sidebar-icon me-2"></i>
-                      {isSidebarExpanded && <span className="sidebar-text">Reset Monthly Points</span>}
-                    </button>
-                  </li>
-                </ul>
-              </li>
-              <li className="mb-3 w-100">
-                <button
-                  onClick={handleLogout}
-                  className={`btn btn-link text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'} p-0`}
-                >
-                  <i className="bi bi-box-arrow-right-fill sidebar-icon me-2"></i>
-                  {isSidebarExpanded && <span className="sidebar-text">Logout</span>}
-                </button>
-              </li>
-              <li className="mb-3">
-                <div className="profile-avatar">
-                  <Link to="/profile" ><img
-                    src={userProfile.photo || "profile-images/default-profile.png"}
-                    alt="Profile"
-                    className="rounded-circle sidebar-profile-icon"
-                  /></Link>
-                </div>
-              </li>
-            </ul>
-          </div>
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    const score = formType === "weekly" ? pointsData.current : MpointsData.current;
+    const submissionData = {
+      timestamp: new Date().toISOString(),
+      type: formType,
+      nickname: formData.nickname,
+      score: score,
+      message: formData.message
+    };
+  
+    try {
+      const response = await fetch('https://eu-west1-dashboard-451923.cloudfunctions.net/submitScore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submissionData),
+      });
+  
+      if (response.ok) {
+        Swal.fire({
+          icon: "success",
+          title: "Submission Successful!",
+          text: "Your score has been submitted.",
+        });
+        setFormData({ nickname: userProfile.name, message: "" });
+      } else {
+        throw new Error("Submission failed");
+      }
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Submission Failed",
+        text: "There was an error submitting your score. Please try again.",
+      });
+    }
+  };
+
+  const styles = {
+    containerFluid: { padding: 0 },
+    logo: {
+      width: "40px",
+      height: "40px",
+      marginRight: "10px",
+    },
+    topBar: {
+      position: "fixed", // Or "relative" if you want it to scroll with content
+      top: 0,
+      width: "100%",
+      height: "60px",
+      backgroundColor: "#ffc107",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-around",
+      zIndex: 1000,
+      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+    },
+    topBarLink: {
+      textDecoration: "none",
+      color: "#666",
+      fontSize: "16px",
+      padding: "0 15px",
+      display: "flex",
+      alignItems: "center",
+      transition: "color 0.3s ease",
+    },
+    topBarIcon: {
+      fontSize: "20px",
+      marginRight: "8px",
+      color: "#666",
+      transition: "color 0.3s ease",
+    },
+    profileAvatar: { position: "relative", display: "inline-block", paddingLeft: "10px" },
+    sidebarProfileIcon: { width: "40px", height: "40px", border: "2px solid #007bff" },
+    dashboardContent: {
+      marginTop: "60px", // Space for the top bar
+      transition: "none", // Remove transition since no expansion/contraction
+      flex: 1,
+    },
+    dashboardCard: { borderRadius: "8px", border: "1px solid #e9ecef", background: "white", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)" },
+    cardBody: { padding: "12px" },
+    cardTitle: { fontSize: "14px", fontWeight: 600 },
+    pointsProgress: {
+      textAlign: "center",
+      padding: "15px",
+      borderRadius: "8px",
+      background: "linear-gradient(135deg, #ff6b6b, #007bff)", // Red to blue gradient
+      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+      transition: "background 0.3s ease, transform 0.3s ease",
+      position: "relative",
+      overflow: "hidden",
+    },
+    monthlyPointsProgress: {
+      textAlign: "center",
+      padding: "15px",
+      borderRadius: "8px",
+      background: "linear-gradient(135deg, #ff6b6b, #ffc107)", // Red to yellow gradient
+      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+      transition: "background 0.3s ease, transform 0.3s ease",
+      position: "relative",
+      overflow: "hidden",
+    },
+    progressText: {
+      fontSize: "24px",
+      fontWeight: "bold",
+      color: "white",
+      textShadow: "1px 1px 3px rgba(0, 0, 0, 0.3)",
+      marginBottom: "10px",
+    },
+    progressIcon: {
+      fontSize: "30px",
+      marginBottom: "10px",
+      animation: "pulse 2s infinite ease-in-out",
+    },
+    sparkEffect: {
+      position: "absolute",
+      top: "-10px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      width: "20px",
+      height: "20px",
+      background: "radial-gradient(circle, rgba(255, 255, 255, 0.8), transparent)",
+      borderRadius: "50%",
+      opacity: 0,
+      animation: "spark 1.5s infinite ease-in-out",
+    },
+    formSelect: { fontSize: "12px", padding: "4px 8px", borderRadius: "4px", marginBottom: "10px" },
+  };
+
+  // Animations for creativity
+  const stylesString = `
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    @keyframes spark {
+      0% { opacity: 0; transform: translateX(-50%) scale(0); }
+      50% { opacity: 0.8; transform: translateX(-50%) scale(1); }
+      100% { opacity: 0; transform: translateX(-50%) scale(0); }
+    }
+  `;
+
+  // Determine icon color based on progress
+  const getProgressColor = (current, total) => {
+    const percentage = (current / total) * 100;
+    if (percentage >= 75) return "#28a745"; // Green for high progress
+    if (percentage >= 25) return "#ffc107"; // Yellow for moderate progress
+    return "#dc3545"; // Red for low progress
+  };
+
+  return (
+    <div style={styles.containerFluid}>
+      <style>{stylesString}</style>
+      <div style={styles.topBar}>
+        <img src="/trackerLogo.png" alt="xAI Logo" style={styles.logo} />
+        <Link to="/dashboard" style={styles.topBarLink}>
+          <i className="bi bi-house-fill" style={styles.topBarIcon}></i>
+          Home
+        </Link>
+        <Link to="/leaderboard" style={styles.topBarLink}>
+          <i className="bi bi-trophy-fill" style={styles.topBarIcon}></i>
+          Leaderboard
+        </Link>
+        <Link to="/profile" style={styles.topBarLink}>
+          <i className="bi bi-person-fill" style={styles.topBarIcon}></i>
+          Profile
+        </Link>
+        <Link to="/statistics" style={styles.topBarLink}>
+          <i className="bi bi-bar-chart-fill" style={styles.topBarIcon}></i>
+          Statistics
+        </Link>
+        <Link to="/ranked-mode" style={styles.topBarLink}>
+          <i className="bi bi-shield-fill" style={styles.topBarIcon}></i>
+          Ranked Mode
+        </Link>
+        <Link to="/normal-mode" style={styles.topBarLink}>
+          <i className="bi bi-star-fill" style={styles.topBarIcon}></i>
+          Normal Mode
+        </Link>
+        <button onClick={handleLogout} style={styles.topBarLink} className="btn btn-link p-0">
+          <i className="bi bi-box-arrow-right-fill" style={styles.topBarIcon}></i>
+          Logout
+        </button>
+        <div style={styles.profileAvatar}>
+          <Link to="/profile">
+            <img
+              src={userProfile.photo || "profile-images/default-profile.png"}
+              alt="Profile"
+              style={styles.sidebarProfileIcon}
+              className="rounded-circle"
+            />
+          </Link>
         </div>
-
-        {/* Main Content */}
-        <div className={`col p-4 dashboard-content ${isSidebarExpanded ? 'expanded' : ''}`}>
-          {/* Profile and Rank Section */}
-          <div className="row mb-4">
-            <div className="col-12 col-md-6 mb-3 mb-md-0">
-              <div className="card dashboard-card shadow-sm">
-                <div className="card-body text-center p-3">
-                  <img
-                    src={userProfile.photo}
-                    alt="Profile"
-                    className="rounded-circle mb-2"
-                    style={{ width: "100px", height: "100px", objectFit: "cover" }}
-                  />
-                  <h4 className="card-title text-dark fw-bold mb-1">{userProfile.name}</h4>
-                  <p className="text-muted small">User ID: {auth.currentUser?.uid?.slice(0, 8)}...</p>
-                </div>
-              </div>
-            </div>
-            <div className="col-12 col-md-6">
-              <div className="card dashboard-card shadow-sm">
-                <div className="card-body text-center p-3">
-                  <h5 className="card-title text-primary mb-2">Your Rank</h5>
-                  <img
-                    src={userProfile.rankImage}
-                    alt="Rank"
-                    className="mb-2"
-                    style={{ width: "60px", height: "60px", objectFit: "contain" }}
-                  />
-                  <h6 className="card-text text-dark fw-bold">{userProfile.rankName}</h6>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Progress Bars */}
-          <div className="row mb-4">
-            <div className="col-12 col-md-4 mb-3 mb-md-0">
-              <div className="card dashboard-card shadow-sm">
-                <div className="card-body p-3">
-                  <h6 className="card-title text-primary mb-2">XP Progress</h6>
-                  <div className="progress" style={{ height: "8px", borderRadius: "4px" }}>
-                    <div
-                      className="progress-bar bg-success"
-                      role="progressbar"
-                      style={{ width: `${xpPercentage}%`, transition: "width 0.3s ease-in-out" }}
-                      aria-valuenow={xpPercentage}
-                      aria-valuemin="0"
-                      aria-valuemax="100"
-                    ></div>
+      </div>
+      <div style={styles.dashboardContent} className="col p-4">
+        {isLoading ? (
+          <div className="text-center">Loading...</div>
+        ) : (
+          <>
+            {/* Profile and Rank Section (Conditional) */}
+            <div className="row mb-4">
+              <div className="col-12 col-md-6 mb-3 mb-md-0">
+                <div style={styles.dashboardCard} className="card shadow-sm">
+                  <div style={styles.cardBody} className="text-center p-3">
+                    <img
+                      src={userProfile.photo}
+                      alt="Profile"
+                      className="rounded-circle mb-2"
+                      style={{ width: "100px", height: "100px", objectFit: "cover" }}
+                    />
+                    <h4 style={styles.cardTitle} className="text-dark fw-bold mb-1">{userProfile.name}</h4>
+                    <p className="text-muted small">User ID: {auth.currentUser?.uid?.slice(0, 8)}...</p>
                   </div>
-                  <p className="card-text mt-2 text-dark small">{xpData.current}/{currentThreshold} XP</p>
                 </div>
               </div>
-            </div>
-            <div className="col-12 col-md-4 mb-3 mb-md-0">
-              <div className="card dashboard-card shadow-sm">
-                <div className="card-body p-3">
-                  <h6 className="card-title text-primary mb-2">Points Progress</h6>
-                  <div className="progress" style={{ height: "8px", borderRadius: "4px" }}>
-                    <div
-                      className="progress-bar bg-info"
-                      role="progressbar"
-                      style={{ width: `${(pointsData.current / pointsData.total) * 100}%` }}
-                      aria-valuenow={(pointsData.current / pointsData.total) * 100}
-                      aria-valuemin="0"
-                      aria-valuemax="100"
-                    ></div>
-                  </div>
-                  <p className="card-text mt-2 text-dark small">{pointsData.current} pts</p>
-                </div>
-              </div>
-            </div>
-            <div className="col-12 col-md-4">
-              <div className="card dashboard-card shadow-sm">
-                <div className="card-body p-3">
-                  <h6 className="card-title text-primary mb-2">Monthly Points Progress</h6>
-                  <div className="progress" style={{ height: "8px", borderRadius: "4px" }}>
-                    <div
-                      className="progress-bar bg-warning"
-                      role="progressbar"
-                      style={{ width: `${(MpointsData.current / MpointsData.total) * 100}%` }}
-                      aria-valuenow={(MpointsData.current / MpointsData.total) * 100}
-                      aria-valuemin="0"
-                      aria-valuemax="100"
-                    ></div>
-                  </div>
-                  <p className="card-text mt-2 text-dark small">{MpointsData.current} pts</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Boost Options Section */}
-          <div className="row mb-4">
-            <div className="col-12">
-              <div className="card dashboard-card shadow-sm">
-                <div className="card-body p-3">
-                  <h6 className="card-title text-primary mb-2">Boost Options (currently not working)</h6>
-                  <div className="row g-3">
-                    <div className="col-12 col-md-6">
-                      <label htmlFor="taskSelect" className="form-label text-dark small">Select Task</label>
-                      <select
-                        id="taskSelect"
-                        className="form-select form-select-sm"
-                        value={selectedTaskIndex !== null ? selectedTaskIndex : ""}
-                        onChange={(e) => setSelectedTaskIndex(e.target.value ? parseInt(e.target.value) : null)}
-                      >
-                        <option value="">Choose a task...</option>
-                        {tasks.map((task, index) => (
-                          <option key={index} value={index}>
-                            {task.name} ({task.xp} XP, {task.points} Points)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-12 col-md-6">
-                      <label htmlFor="boostSelect" className="form-label text-dark small">Select Boost</label>
-                      <select
-                        id="boostSelect"
-                        className="form-select form-select-sm"
-                        value={selectedBoost || ""}
-                        onChange={(e) => setSelectedBoost(e.target.value)}
-                        disabled={!selectedTaskIndex}
-                      >
-                        <option value="">Choose a boost...</option>
-                        {Object.entries(BOOSTS).map(([boostType]) => (
-                          <option key={boostType} value={boostType}>
-                            {boostType.replace(/([A-Z])/g, ' $1').trim()} 
-                            {tasks[selectedTaskIndex]?.boost === boostType && " (Applied)"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-12 text-end">
-                      <button
-                        onClick={applyBoost}
-                        className="btn btn-primary btn-sm mt-2"
-                        disabled={!selectedTaskIndex || !selectedBoost}
-                      >
-                        Apply Boost
-                      </button>
+              {hasStartedRanked && (
+                <div className="col-12 col-md-6">
+                  <div style={styles.dashboardCard} className="card shadow-sm">
+                    <div style={styles.cardBody} className="text-center p-3">
+                      <h5 className="card-title text-primary mb-2">Your Rank</h5>
+                      <img
+                        src={userProfile.rankImage}
+                        alt="Rank"
+                        className="mb-2"
+                        style={{ width: "60px", height: "60px", objectFit: "contain" }}
+                      />
+                      <h6 className="card-text text-dark fw-bold">{userProfile.rankName}</h6>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
-          </div>
 
-          {/* Task Sections with Boosts */}
-          <div className="row">
-            <div className="col-12 col-md-6 mb-3 mb-md-0">
-              <div className="card dashboard-card shadow-sm h-100">
-                <div className="card-body p-3">
-                  <h6 className="card-title text-primary mb-2">Available Tasks</h6>
-                  <div className="accordion" id="tasksAccordion">
-                    {Object.entries(groupedTasks).map(([category, categoryTasks], index) => (
-                      <div className="accordion-item" key={category}>
-                        <h2 className="accordion-header" id={`heading-${category}`}>
-                          <button
-                            className={`accordion-button ${!openSections[category] ? 'collapsed' : ''} text-dark`}
-                            type="button"
-                            onClick={() => toggleSection(category)}
-                            aria-expanded={openSections[category]}
-                            aria-controls={`collapse-${category}`}
-                          >
-                            {category} ({categoryTasks.length} tasks)
-                          </button>
-                        </h2>
-                        <div
-                          id={`collapse-${category}`}
-                          className={`accordion-collapse collapse ${openSections[category] ? 'show' : ''}`}
-                          aria-labelledby={`heading-${category}`}
-                        >
-                          <div className="accordion-body p-2">
-                            {categoryTasks.length > 0 ? (
-                              <ul className="list-group list-group-flush">
-                                {categoryTasks.map((task, taskIndex) => {
-                                  const originalIndex = tasks.findIndex(t => t.name === task.name);
-                                  return (
-                                    <li 
-                                      key={taskIndex} 
-                                      className={`list-group-item d-flex justify-content-between align-items-center py-1 position-relative ${task.boost ? 'boosted-task' : ''}`}
-                                      id={`task-${originalIndex}`}
-                                    >
-                                      <div>
-                                        <span style={{ color: "#dc3545" }}>{task.name}</span>
-                                        <br />
-                                        <small className="text-muted">
-                                          ({task.xp} XP, {task.points} Points) | 
-                                          Completed: {task.completionCount}/{task.numberLimit}
-                                          {task.boost && (
-                                            <span className="boost-badge ms-2">
-                                              <i className="bi bi-lightning-fill" title={BOOSTS[task.boost].description}></i>
-                                              <span className="boost-name">&nbsp;{BOOSTS[task.boost].name}</span>
-                                            </span>
-                                          )}
-                                        </small>
-                                      </div>
-                                      <div>
-                                        <button
-                                          onClick={() => completeTask(originalIndex)}
-                                          className="btn btn-success btn-sm me-1"
-                                          disabled={task.completionCount >= task.numberLimit}
-                                        >
-                                          Complete
-                                        </button>
-                                        <button
-                                          onClick={() => resetTaskCompletionCount(originalIndex)}
-                                          className="btn btn-warning btn-sm"
-                                        >
-                                          Reset
-                                        </button>
-                                        {task.boost && (
-                                          <button
-                                            onClick={() => removeBoost(originalIndex)}
-                                            className="btn btn-danger btn-xs ms-1" 
-                                          >
-                                            Remove Boost
-                                          </button>
-                                        )}
-                                      </div>
-                                      {/* Render notifications for this task (bonus only) */}
-                                      {notifications
-                                        .filter((n) => n.position === `task-${originalIndex}`)
-                                        .map((notification) => (
-                                          <div
-                                            key={notification.id}
-                                            className="task-notification"
-                                            style={{
-                                              position: "absolute",
-                                              top: "-20px",
-                                              right: "0",
-                                              fontSize: "12px",
-                                              color: "#28a745",
-                                              fontWeight: "bold",
-                                              animation: "popUp 2s ease-out forwards",
-                                            }}
-                                          >
-                                            {notification.points ? `+${notification.points}pts` : ""}
-                                            {notification.xp ? ` +${notification.xp}XP` : ""}
-                                          </div>
-                                        ))}
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            ) : (
-                              <p className="text-muted small">No tasks in this category</p>
-                            )}
-                          </div>
-                        </div>
+            {/* Progress Sections (Text with Visual Cues) */}
+            <div className="row mb-4">
+              {hasStartedRanked && (
+                <div className="col-12 col-md-4 mb-3 mb-md-0">
+                  <div style={styles.dashboardCard} className="card shadow-sm">
+                    <div style={styles.cardBody} className="p-3 text-center">
+                      <h6 style={styles.cardTitle} className="card-title text-primary mb-2">XP Progress</h6>
+                      <div style={styles.pointsProgress} onAnimationEnd={(e) => e.target.style.transform = "scale(1)"}>
+                        <i
+                          className="bi bi-shield-fill"
+                          style={{
+                            ...styles.progressIcon,
+                            color: getProgressColor(xpData.current, currentThreshold),
+                          }}
+                        />
+                        <p style={styles.progressText}>{xpData.current} / {currentThreshold} XP</p>
                       </div>
-                    ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="col-12 col-md-4 mb-3 mb-md-0">
+                <div style={styles.dashboardCard} className="card shadow-sm">
+                  <div style={styles.cardBody} className="p-3 text-center">
+                    <h6 style={styles.cardTitle} className="card-title text-primary mb-2">Points Progress</h6>
+                    <div style={styles.pointsProgress} onAnimationEnd={(e) => e.target.style.transform = "scale(1)"}>
+                      <i
+                        className="bi bi-star-fill"
+                        style={{
+                          ...styles.progressIcon,
+                          color: getProgressColor(pointsData.current, pointsData.total),
+                        }}
+                      />
+                      <p style={styles.progressText}>{pointsData.current} / {pointsData.total} pts</p>
+                      <button onClick={resetPointsBar} className="btn btn-warning btn-sm mt-2 w-100">Reset Points</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="col-12 col-md-4">
+                <div style={styles.dashboardCard} className="card shadow-sm">
+                  <div style={styles.cardBody} className="p-3 text-center">
+                    <h6 style={styles.cardTitle} className="card-title text-primary mb-2">Monthly Points Progress</h6>
+                    <div style={styles.monthlyPointsProgress} onAnimationEnd={(e) => e.target.style.transform = "scale(1)"}>
+                      <i
+                        className="bi bi-trophy-fill"
+                        style={{
+                          ...styles.progressIcon,
+                          color: getProgressColor(MpointsData.current, MpointsData.total),
+                        }}
+                      />
+                      <p style={styles.progressText}>{MpointsData.current} / {MpointsData.total} pts</p>
+                      <button onClick={resetMonthlyPointsBar} className="btn btn-warning btn-sm mt-2 w-100">Reset Monthly Points</button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="col-12 col-md-6">
-              <div className="card dashboard-card shadow-sm h-100">
-                <div className="card-body p-3">
-                  <h6 className="card-title text-primary mb-2">Today's Completed Tasks</h6>
-                  <ul className="list-group list-group-flush">
-                    {completedTasks.map((task, index) => (
-                      <li key={index} className="list-group-item d-flex justify-content-between align-items-center py-1">
-                        <span>
-                          <span className="fw-bold text-dark">{task.completionCount}x</span> {task.name}
-                        </span>
-                        <button onClick={() => undoTask(index)} className="btn btn-danger btn-sm">
-                          Undo
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  {completedTasks.length === 0 && (
-                    <p className="text-muted text-center small">No completed tasks today.</p>
-                  )}
+            {/* Score Submission Form */}
+            <div className="row mb-4 justify-content-center">
+              <div className="col-12 col-md-6">
+                <div style={styles.dashboardCard} className="card shadow-sm">
+                  <div style={styles.cardBody} className="p-3">
+                    <h6 style={styles.cardTitle} className="text-primary mb-3">Submit Your Score</h6>
+                    <form onSubmit={handleFormSubmit}>
+                      <div className="mb-3">
+                        <select
+                          value={formType}
+                          onChange={(e) => setFormType(e.target.value)}
+                          style={styles.formSelect}
+                          className="form-select"
+                        >
+                          <option value="weekly">Weekly Score</option>
+                          <option value="monthly">Monthly Score</option>
+                        </select>
+                      </div>
+                      <div className="mb-3">
+                        <label className="form-label small text-muted">Nickname</label>
+                        <input
+                          type="text"
+                          name="nickname"
+                          value={formData.nickname}
+                          onChange={handleFormChange}
+                          className="form-control form-control-sm"
+                          required
+                        />
+                      </div>
+                      <div className="mb-3">
+                        <label className="form-label small text-muted">Score</label>
+                        <input
+                          type="number"
+                          value={formType === "weekly" ? pointsData.current : MpointsData.current}
+                          className="form-control form-control-sm"
+                          disabled
+                        />
+                      </div>
+                      <div className="mb-3">
+                        <label className="form-label small text-muted">Message for Admin</label>
+                        <textarea
+                          name="message"
+                          value={formData.message}
+                          onChange={handleFormChange}
+                          className="form-control form-control-sm"
+                          rows="3"
+                        />
+                      </div>
+                      <button type="submit" className="btn btn-primary btn-sm w-100">Submit Score</button>
+                    </form>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

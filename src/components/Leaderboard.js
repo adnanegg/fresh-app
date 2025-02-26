@@ -6,6 +6,7 @@ import { useNavigate,Link } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "./styles/Leaderboard.css";
+import { signOut } from "firebase/auth";
 
 // Ranking configuration (copied from Dashboard.js to ensure consistency)
 const rankingConfig = {
@@ -69,6 +70,12 @@ const Leaderboard = () => {
     return () => unsubscribe();
   }, [navigate]);
 
+  const handleLogout = async () => {
+     await signOut(auth);
+     navigate("/signup");
+   };
+ 
+
   const toggleSidebar = () => {
     setIsSidebarExpanded(!isSidebarExpanded);
   };
@@ -82,7 +89,9 @@ const Leaderboard = () => {
       </div>
     );
   }
+ 
 
+  
   return (
     <div className="container-fluid">
     <div className="row">
@@ -124,7 +133,28 @@ const Leaderboard = () => {
                   {isSidebarExpanded && <span className="sidebar-text">Statistics</span>}
                 </Link>
               </li>
-            <li className="mb-3">
+              <li className="mb-3 w-100">
+                <Link to="/ranked-mode" className={`text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'}`}>
+                  <i className="bi bi-shield-fill sidebar-icon me-2"></i>
+                  {isSidebarExpanded && <span className="sidebar-text">Ranked Mode</span>}
+                </Link>
+              </li>
+              <li className="mb-3 w-100">
+               <Link to="/normal-mode" className={`text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'}`}>
+                <i className="bi bi-star-fill sidebar-icon me-2"></i>
+                {isSidebarExpanded && <span className="sidebar-text">Normal Mode</span>}
+               </Link>
+              </li>
+              <li className="mb-3 w-100">
+                <button
+                  onClick={handleLogout}
+                  className={`btn btn-link text-dark d-flex align-items-center ${isSidebarExpanded ? 'justify-content-start' : 'justify-content-center'} p-0`}
+                >
+                  <i className="bi bi-box-arrow-right-fill sidebar-icon me-2"></i>
+                  {isSidebarExpanded && <span className="sidebar-text">Logout</span>}
+                </button>
+              </li>
+             <li className="mb-3">
               <div className="profile-avatar">
                 <Link to="/profile"><img
                   src={userProfile.photo || "profile-images/default-profile.png"} // You'll need to fetch or pass userProfile here

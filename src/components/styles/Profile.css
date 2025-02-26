@@ -1,16 +1,52 @@
 /* Profile.css */
-.profile-content {
-  transition: width 0.3s ease;
+
+/* Top bar styles */
+.top-bar {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  height: 60px;
+  background-color: #ffc107;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.profile-content.expanded {
-  width: calc(100% - 250px);
+.top-bar-link {
+  text-decoration: none;
+  color: #666;
+  font-size: 16px;
+  padding: 0 15px;
+  display: flex;
+  align-items: center;
+  transition: color 0.3s ease;
 }
 
-.profile-content:not(.expanded) {
-  width: calc(100% - 70px);
+.top-bar-link:hover {
+  color: #007bff;
 }
 
+.top-bar-icon {
+  font-size: 20px;
+  margin-right: 8px;
+  color: #666;
+  transition: color 0.3s ease;
+}
+
+.top-bar-icon:hover {
+  color: #007bff;
+}
+
+/* Main content */
+.dashboard-content {
+  margin-top: 60px; /* Space for the top bar */
+  padding: 20px;
+  transition: none; /* Remove transition since no expansion/contraction */
+}
+
+/* Keep existing profile-specific styles */
 .profile-container {
   max-width: 800px;
   margin: 0 auto;
@@ -191,120 +227,16 @@
   background: #0056b3;
 }
 
-/* Sidebar styles (unchanged, but included for completeness) */
-.sidebar-container {
-  height: 100vh;
-  position: sticky;
-  top: 0;
-  transition: width 0.3s ease;
-}
-
-.sidebar-container:not(.expanded) {
-  width: 70px;
-}
-
-.sidebar-container.expanded {
-  width: 250px;
-}
-
-.sidebar {
-  background-color: #f8f9fa;
-  height: 100%;
-  padding: 20px 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.sidebar-header {
-  margin-bottom: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.whale-logo {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 10px;
-}
-
-.expand-toggle {
-  font-size: 16px;
-  padding: 5px;
-}
-
-.sidebar-nav li {
-  list-style: none;
-  width: 100%;
-}
-
-.sidebar-nav li a,
-.sidebar-nav li button {
-  padding: 8px 16px;
-  text-decoration: none;
-  color: #666;
-  width: 100%;
-  display: flex;
-  align-items: center;
-}
-
-.sidebar-icon {
-  font-size: 24px;
-  color: #666;
-  margin-right: 8px;
-  transition: color 0.3s ease;
-}
-
-.sidebar-icon:hover {
-  color: #007bff;
-}
-
-.sidebar-text {
-  font-size: 14px;
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.sidebar-container.expanded .sidebar-text {
-  opacity: 1;
-}
-
-.sidebar-container:not(.expanded) .sidebar-text {
-  display: none;
-}
-
-.profile-avatar {
-  position: relative;
-  display: inline-block;
-}
-
-.sidebar-profile-icon {
-  width: 40px;
-  height: 40px;
-  border: 2px solid #007bff;
-}
-
+/* Remove sidebar-specific styles */
+.sidebar-container,
+.sidebar,
+.sidebar-header,
+.whale-logo,
+.expand-toggle,
+.sidebar-nav,
+.sidebar-icon,
+.sidebar-text,
+.profile-avatar,
 .notification-badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background-color: #dc3545;
-  color: white;
-  border-radius: 50%;
-  width: 15px;
-  height: 15px;
-  font-size: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.profile-content.expanded {
-  width: calc(100% - 250px);
-}
-
-.profile-content:not(.expanded) {
-  width: calc(100% - 70px);
+  display: none; /* Remove unused sidebar styles */
 }

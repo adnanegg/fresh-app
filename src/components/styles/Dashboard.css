@@ -1,11 +1,10 @@
-/* Dashboard.css (Optimized) */
+/* Dashboard.css (Optimized)
 .container-fluid {
   padding: 0;
 }
 
 .sidebar-container {
   height: 100vh;
-  position: sticky;
   top: 0;
   transition: width 0.3s ease;
 }
@@ -19,7 +18,7 @@
 }
 
 .sidebar {
-  background-color: #f8f9fa;
+  background-color: #fafaf8;
   height: 100%;
   padding: 20px 0;
   display: flex;
@@ -246,4 +245,4 @@
     opacity: 0;
     transform: translateY(-30px) scale(1);
   }
-}
+} */
