@@ -44,69 +44,56 @@ const Signup = () => {
         xp: { current: 0, level: 1 }, // Initialize XP
         tasks: [
           // Default tasks (replace with your config.tasks)
-          { name: "Read 5 pages of a book ", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
-            numberLimit: 7, frequencyUnit: "days", weeklyFrequency: 7,hasExceptionalOption: true, selectedMode: 'normal' },
+          { name: "Read 5 pages of a book ", points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
+            numberLimit: 7, frequencyUnit: "days", weeklyFrequency: 7,hasExceptionalOption: true, selectedMode: 'normal',boost: null,hasTimesOption: false, },
 
-          { name: "Quran : Read nissf hizb", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
-            numberLimit: 7,frequencyUnit: "days", weeklyFrequency: 7,hasExceptionalOption: true, selectedMode: 'normal'   },
+          { name: "Quran : Read nissf hizb",  points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
+            numberLimit: 7,frequencyUnit: "days", weeklyFrequency: 7,hasExceptionalOption: true, selectedMode: 'normal' ,boost: null,hasTimesOption: false  },
 
-          { name: "Sport : Exercice for 20 min", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
-            numberLimit: 3,frequencyUnit: "days", weeklyFrequency: 3,hasExceptionalOption: false  },
+          { name: "Sport : Exercice for 20 min",  points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
+            numberLimit: 3,frequencyUnit: "days", weeklyFrequency: 3,hasExceptionalOption: false,boost: null,hasTimesOption: false  },
 
-          { name: "Prayer At The Mosque", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
-            numberLimit: 7,frequencyUnit: "times", requiredCompletions: 7,hasExceptionalOption: true, selectedMode: 'normal'   },
+          { name: "Prayer At The Mosque",  points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
+            numberLimit: 7,frequencyUnit: "times", requiredCompletions: 7,hasExceptionalOption: true,hasTimesOption: true, selectedMode: 'normal',boost: null   },
 
-          { name: "listen to quoran", xp: 500, points: 10, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 2,frequencyUnit: "days", weeklyFrequency: 2,hasExceptionalOption: false   },
+          { name: "listen to quoran", points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 2,frequencyUnit: "days", weeklyFrequency: 2,hasExceptionalOption: false,boost: null ,hasTimesOption: false,hasTimesOption: false  },
 
-          { name: "15 Min Improvement", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
-            numberLimit: 7,frequencyUnit: "days", weeklyFrequency: 7,hasExceptionalOption: false   },
+          { name: "15 Min Improvement",  points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
+            numberLimit: 7,frequencyUnit: "days", weeklyFrequency: 7,hasExceptionalOption: false ,boost: null ,hasTimesOption: false },
 
-          { name: "Wake up early", xp: 500, points: 10, category: "Task", penalty: 5,completionCount: 0,
-            numberLimit: 6,frequencyUnit: "days", weeklyFrequency: 6,hasExceptionalOption: false  }, 
+          { name: "Wake up early",  points: 10, category: "Task", penalty: 5,completionCount: 0,
+            numberLimit: 6,frequencyUnit: "days", weeklyFrequency: 6,hasExceptionalOption: false,boost: null,hasTimesOption: false  }, 
 
-          { name: "الشفع و الوتر", xp: 300, points: 40, category: "Bonus", penalty: 5,completionCount: 0,
-            numberLimit: 5,frequencyUnit: "days", weeklyFrequency: 5,hasExceptionalOption: false  },
+          { name: "الشفع و الوتر", points: 40, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 5,frequencyUnit: "days", weeklyFrequency: 5,hasExceptionalOption: false ,boost: null,hasTimesOption: false },
 
-          { name: "Presentation", xp: 1000, points: 50, category: "Bonus", penalty: 5,completionCount: 0,
-            numberLimit: 1.,frequencyUnit: "days", weeklyFrequency: 1,hasExceptionalOption: false  },
+          { name: "Presentation", points: 50, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1.,frequencyUnit: "days", weeklyFrequency: 1,hasExceptionalOption: false,boost: null,hasTimesOption: false  },
 
-          { name: "One day no social Media", xp: 1000, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
-            numberLimit: 1,frequencyUnit: "days", weeklyFrequency: 1,hasExceptionalOption: false },
+          { name: "One day no social Media", points: 30, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1,frequencyUnit: "days", weeklyFrequency: 1,hasExceptionalOption: false,boost: null ,hasTimesOption: false},
 
-          { name: "ختم القرأن", xp: 2000, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
-            numberLimit: 1,frequencyUnit: "days", weeklyFrequency: 1 ,hasExceptionalOption: false },
+          { name: "ختم القرأن", points: 30, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1,frequencyUnit: "days", weeklyFrequency: 1 ,hasExceptionalOption: false,boost: null,hasTimesOption: false },
 
-          { name: "Attend the Weekly meeting", xp: 300, points: 10, category: "Bonus", penalty: 5,completionCount: 0,
-            numberLimit: 1,frequencyUnit: "days", weeklyFrequency: 1,hasExceptionalOption: false  },
+          { name: "Attend the Weekly meeting",points: 10, category: "Bonus", penalty: 5,completionCount: 0,
+            numberLimit: 1,frequencyUnit: "days", weeklyFrequency: 1,hasExceptionalOption: false,boost: null ,hasTimesOption: false },
 
-          // { name: "Quran Exception", xp: 250, points: 5, category: "Task", penalty: 5,completionCount: 0,
-          //   numberLimit: 7,frequencyUnit: "days", weeklyFrequency: 7,hasExceptionalOption: true, selectedMode: 'normal'   },
-
-          // { name: "Book Exception", xp: 250, points: 5, category: "Task", penalty: 5,completionCount: 0,
-          //   numberLimit: 7,frequencyUnit: "days", weeklyFrequency: 7   },
-
-          // { name: "Prayer Exception", xp: 250, points: 5, category: "Task", penalty: 5,completionCount: 0,
-          //   numberLimit: 7,frequencyUnit: "times", requiredCompletions: 7 },
-          // Add more tasks as needed
+          
         ],
         rankedTasks : [
-          {taskId:"book_read", name: "Read 5 pages of a book ", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10,completionCount: 0 },
+          {taskId:"book_read", name: "Read 5 pages of a book ", xp: 500,category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10,completionCount: 0 },
 
-          {taskId:"quran_read", name: "Quran : Read nissf hizb", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
-              },
+          {taskId:"quran_read", name: "Quran : Read nissf hizb", xp: 500,  category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,},
 
-          {taskId:"sport_exercise", name: "Sport : Exercice for 20 min", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,
-            },
+          {taskId:"sport_exercise", name: "Sport : Exercice for 20 min", xp: 500, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, penalty: 5,completionCount: 0,},
 
-          {taskId:"prayer_mosque", name: "Prayer At The Mosque", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, completionCount: 0,
-            },
+          {taskId:"prayer_mosque", name: "Prayer At The Mosque", xp: 500,  category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, completionCount: 0,},
 
-          {taskId:"listen_to_quoran", name: "listen to quoran", xp: 500, points: 10, category: "Task", completionCount: 0,
-      },
+          {taskId:"listen_to_quoran", name: "listen to quoran", xp: 500, category: "Task", completionCount: 0,},
 
-          {taskId:"improvement", name: "15 Min Improvement", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10,completionCount: 0,
-    },
+          {taskId:"improvement", name: "15 Min Improvement", xp: 500, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10,completionCount: 0,},
 
           {taskId:"Wake_up_early" ,name: "Wake up early", xp: 500, points: 10, category: "Task",level: 1,maxLevel: 3,requiredCompletionsForNextLevel:10, completionCount: 0, }, 
 
@@ -116,13 +103,13 @@ const Signup = () => {
           {name: "Presentation", xp: 1000, points: 50, category: "Bonus", penalty: 5,completionCount: 0,
             },
 
-          {taskId:"One_day_no_social_media", name: "One day no social Media", xp: 1000, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
+          {taskId:"One_day_no_social_media", name: "One day no social Media", xp: 1000, category: "Bonus", penalty: 5,completionCount: 0,
            },
 
-          { name: "ختم القرأن", xp: 2000, points: 30, category: "Bonus", penalty: 5,completionCount: 0,
+          { name: "ختم القرأن", xp: 2000, category: "Bonus", penalty: 5,completionCount: 0,
           },
 
-          {taskId:"Attend_the_weekly_meeting" ,name: "Attend the Weekly meeting", xp: 300, points: 10, category: "Bonus", penalty: 5,completionCount: 0, },
+          {taskId:"Attend_the_weekly_meeting" ,name: "Attend the Weekly meeting", xp: 300, category: "Bonus", penalty: 5,completionCount: 0, },
         ],
         completedTasks: [],
         hasStartedRanked: false,
