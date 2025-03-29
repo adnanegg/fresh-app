@@ -1,207 +1,375 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { auth, database } from "../firebase";
-import { ref, onValue, update } from "firebase/database";
+import { ref, get, update } from "firebase/database";
 import { useNavigate, Link } from "react-router-dom";
 import { signOut } from "firebase/auth";
 import Swal from "sweetalert2";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
-import "./styles/Profile.css"; // Use CSS for styling
+import "./styles/Profile.css";
 
 const Profile = () => {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [photo, setPhoto] = useState("");
-  const [photoFile, setPhotoFile] = useState(null);
-  const [userProfile, setUserProfile] = useState({
-    name: "User",
-    photo: "profile-images/default-profile.png",
-    rankName: "Warrior",
-    rankImage: "ranking-images/rank-warrior.png",
+  const userId = auth.currentUser?.uid;
+  const [userProfile, setUserProfile] = useState(() => {
+    const storedData = localStorage.getItem(`userData_${userId}`);
+    return storedData
+      ? JSON.parse(storedData)
+      : {
+          profile: {
+            name: auth.currentUser?.displayName || "User",
+          },
+          points: { current: 0, total: 4500 },
+          Mpoints: { current: 0, total: 12000 },
+          lastUpdated: Date.now(),
+        };
   });
+  const [tempName, setTempName] = useState(userProfile.profile?.name || "");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const userId = auth.currentUser?.uid;
-    if (!userId) {
-      navigate("/profile");
-      return;
-    }
+  const syncWithFirebase = useCallback(
+    async (forceSync = false) => {
+      if (!userId) return;
+      try {
+        const userRef = ref(database, `users/${userId}`);
+        const snapshot = await get(userRef);
+        const firebaseData = snapshot.val() || {};
+        const localLastUpdated = userProfile.lastUpdated || 0;
+        const firebaseLastUpdated = firebaseData.lastUpdated || 0;
 
-    const userRef = ref(database, `users/${userId}/profile`);
-    onValue(userRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setName(data.name || "");
-        setPhoto(data.photo || "profile-images/default-profile.png");
-        setUserProfile({
-          ...userProfile,
-          name: data.name || "User",
-          photo: data.photo || "profile-images/default-profile.png",
-          rankName: data.rankName || "Warrior",
-          rankImage: data.rankImage || "ranking-images/rank-warrior.png",
+        if (forceSync || firebaseLastUpdated > localLastUpdated) {
+          localStorage.setItem(
+            `userData_${userId}`,
+            JSON.stringify(firebaseData)
+          );
+          setUserProfile(firebaseData);
+          setTempName(firebaseData.profile?.name || "");
+        } else {
+          const updatedData = {
+            ...userProfile,
+            lastUpdated: Date.now(),
+          };
+          await update(userRef, updatedData);
+          localStorage.setItem(
+            `userData_${userId}`,
+            JSON.stringify(updatedData)
+          );
+        }
+      } catch (error) {
+        console.error("Sync error:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Sync Failed",
+          text: error.message,
         });
       }
+    },
+    [userId, userProfile]
+  );
+
+  const fetchUserData = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const userRef = ref(database, `users/${userId}`);
+      const snapshot = await get(userRef);
+      const firebaseData = snapshot.val() || {};
+
+      // Merge with existing local data
+      const localData =
+        JSON.parse(localStorage.getItem(`userData_${userId}`)) || {};
+      const mergedData = {
+        ...localData,
+        ...firebaseData,
+        profile: {
+          ...localData.profile,
+          ...firebaseData.profile,
+        },
+      };
+
+      setUserProfile(mergedData);
+      setTempName(mergedData.profile?.name || "");
+      localStorage.setItem(`userData_${userId}`, JSON.stringify(mergedData));
+    } catch (error) {
+      console.error("Fetch error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Fetch Failed",
+        text: "Could not load profile data.",
+      });
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    let intervalId;
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        navigate("/login");
+      } else {
+        fetchUserData().then(() => syncWithFirebase());
+        intervalId = setInterval(() => syncWithFirebase(), 15 * 60 * 1000); // 15 minutes
+      }
     });
-  }, [navigate]);
+
+    return () => {
+      unsubscribeAuth();
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [navigate, fetchUserData, syncWithFirebase]);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
-    const userId = auth.currentUser?.uid;
-
     if (!userId) return;
 
     try {
-      let photoUrl = photo;
+      const updatedData = {
+        profile: {
+          name: tempName,
+        },
+        points: userProfile.points || { current: 0, total: 4500 },
+        Mpoints: userProfile.Mpoints || { current: 0, total: 12000 },
+        lastUpdated: Date.now(),
+      };
 
-      if (photoFile) {
-        const reader = new FileReader();
-        reader.readAsDataURL(photoFile);
-        
-        photoUrl = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-        });
-      }
+      const userRef = ref(database, `users/${userId}`);
+      await update(userRef, updatedData);
 
-      const userRef = ref(database, `users/${userId}/profile`);
-      await update(userRef, {
-        name: name,
-        photo: photoUrl,
-        rankName: userProfile.rankName, // Preserve rank
-        rankImage: userProfile.rankImage, // Preserve rank image
-      });
-
-      setName("");
-      setPhotoFile(null);
+      setUserProfile(updatedData);
+      localStorage.setItem(`userData_${userId}`, JSON.stringify(updatedData));
 
       Swal.fire({
         icon: "success",
         title: "Profile Updated!",
-        text: "Your profile has been updated successfully.",
-        confirmButtonText: "OK",
-        showConfirmButton: true,
-        customClass: {
-          popup: "swal2-modern",
-        },
+        text: "Your profile has been successfully updated.",
       });
     } catch (error) {
+      console.error("Update error:", error);
       Swal.fire({
         icon: "error",
         title: "Update Failed",
         text: error.message,
-        confirmButtonText: "OK",
-        customClass: {
-          popup: "swal2-modern",
-        },
       });
     }
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/signup");
+    try {
+      await syncWithFirebase(true); // Force sync on logout
+      await signOut(auth);
+      // Don't clear localStorage here to maintain data
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Logout Failed",
+        text: error.message,
+      });
+    }
   };
 
+  const handleSyncNow = () => {
+    syncWithFirebase(true); // Force sync
+  };
+
+  const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
+
+  const styles = {
+    navBar: {
+      position: "fixed",
+      top: "0",
+      width: "100%",
+      background: "#ffc107",
+      padding: "0.5rem 1rem",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      zIndex: 1000,
+      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+    },
+    navBrand: { display: "flex", alignItems: "center" },
+    navLogo: { width: "32px", height: "32px", marginRight: "8px" },
+    navTitle: { fontWeight: "bold", fontSize: "18px", color: "#333" },
+    hamburgerMenu: {
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "space-around",
+      width: "30px",
+      height: "24px",
+      background: "transparent",
+      border: "none",
+      cursor: "pointer",
+      padding: "0",
+      zIndex: "10",
+    },
+    hamburgerLine: {
+      width: "30px",
+      height: "3px",
+      background: "#333",
+      borderRadius: "10px",
+      transition: "all 0.3s linear",
+    },
+    mobileMenu: {
+      position: "fixed",
+      top: "60px",
+      right: "0",
+      width: "220px",
+      height: "calc(100% - 60px)",
+      backgroundColor: "#fff",
+      boxShadow: "-4px 0 8px rgba(0, 0, 0, 0.1)",
+      transition: "transform 0.3s ease-in-out",
+      transform: mobileMenuOpen ? "translateX(0)" : "translateX(100%)",
+      zIndex: "999",
+      display: "flex",
+      flexDirection: "column",
+      padding: "20px 0",
+    },
+    mobileNavLink: {
+      padding: "12px 20px",
+      textDecoration: "none",
+      color: "#333",
+      fontSize: "16px",
+      borderBottom: "1px solid #eee",
+      display: "flex",
+      alignItems: "center",
+    },
+    navIcon: { marginRight: "10px", fontSize: "18px" },
+    logoutButton: {
+      margin: "10px 20px",
+      padding: "10px",
+      background: "#dc3545",
+      color: "#fff",
+      border: "none",
+      borderRadius: "4px",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+  };
+
+  const cssStyles = `
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+  `;
+
   return (
-    <div className="container-fluid">
-      <div className="top-bar">
-        <img src="/trackerLogo.png" alt="xAI Logo" className="whale-logo" />
-        <Link to="/dashboard" className="top-bar-link">
-          <i className="bi bi-house-fill top-bar-icon"></i>
-          Dashboard
-        </Link>
-        <Link to="/leaderboard" className="top-bar-link">
-          <i className="bi bi-trophy-fill top-bar-icon"></i>
-          Leaderboard
-        </Link>
-        <Link to="/profile" className="top-bar-link">
-          <i className="bi bi-person-fill top-bar-icon"></i>
-          Profile
-        </Link>
-        <Link to="/statistics" className="top-bar-link">
-          <i className="bi bi-bar-chart-fill top-bar-icon"></i>
-          Statistics
-        </Link>
-        <Link to="/ranked-mode" className="top-bar-link">
-          <i className="bi bi-shield-fill top-bar-icon"></i>
-          Ranked Mode
-        </Link>
-        <Link to="/normal-mode" className="top-bar-link">
-          <i className="bi bi-star-fill top-bar-icon"></i>
-          Normal Mode
-        </Link>
-        <div className="profile-avatar">
-          <Link to="/profile">
-            <img
-              src={userProfile.photo || "profile-images/default-profile.png"}
-              alt="Profile"
-              className="sidebar-profile-icon rounded-circle"
-            />
-          </Link>
+    <div className="profile-container">
+      <style>{cssStyles}</style>
+      <nav style={styles.navBar}>
+        <div style={styles.navBrand}>
+          <img src="/trackerLogo.png" alt="Logo" style={styles.navLogo} />
+          <span style={styles.navTitle}>Profile</span>
         </div>
+        <button
+          style={styles.hamburgerMenu}
+          onClick={toggleMobileMenu}
+          aria-label="Toggle menu"
+        >
+          <div style={styles.hamburgerLine}></div>
+          <div style={styles.hamburgerLine}></div>
+          <div style={styles.hamburgerLine}></div>
+        </button>
+      </nav>
+      <div
+        style={{
+          ...styles.mobileMenu,
+          transform: mobileMenuOpen ? "translateX(0)" : "translateX(100%)",
+        }}
+      >
+        <Link to="/dashboard" style={styles.mobileNavLink}>
+          <i className="bi bi-house-fill" style={styles.navIcon}></i> Dashboard
+        </Link>
+        <Link to="/normal-mode" style={styles.mobileNavLink}>
+          <i className="bi bi-star-fill" style={styles.navIcon}></i> Program
+        </Link>
+        <button onClick={handleLogout} style={styles.logoutButton}>
+          <i className="bi bi-box-arrow-right" style={styles.navIcon}></i>{" "}
+          Logout
+        </button>
       </div>
-      <div className="dashboard-content">
-        <div className="profile-container">
-          <div className="profile-header text-center mb-5">
-            <h1 className="profile-title">User Profile</h1>
-            <div className="profile-rank mb-3">
-              <img
-                src={userProfile.rankImage}
-                alt={userProfile.rankName}
-                className="rank-icon"
-              />
-              <h3 className="rank-name text-dark fw-bold">{userProfile.rankName}</h3>
-            </div>
+
+      <main className="profile-main">
+        <div className="profile-header">
+          <div className="header-info">
+            <h1 className="user-name">{userProfile.profile?.name}</h1>
           </div>
+        </div>
 
-          <div className="profile-card shadow-lg">
-            <div className="profile-avatar-section">
-              <div className="avatar-wrapper">
-                <img
-                  src={photo || userProfile.photo}
-                  alt="Profile"
-                  className="profile-avatar-img"
-                />
-                <label htmlFor="photoUpload" className="upload-btn">
-                  <i className="bi bi-camera-fill"></i> Change Photo
-                </label>
-                <input
-                  type="file"
-                  id="photoUpload"
-                  className="d-none"
-                  accept="image/*"
-                  onChange={(e) => setPhotoFile(e.target.files[0])}
-                />
-              </div>
-            </div>
-
-            <form onSubmit={handleUpdateProfile} className="profile-form">
-              <div className="form-group mb-4">
-                <label className="form-label text-dark fw-bold">Name</label>
+        <form onSubmit={handleUpdateProfile} className="profile-form">
+          <div className="form-section">
+            <h2>Profile Details</h2>
+            <div className="form-grid">
+              <div className="form-group">
+                <label>Name</label>
                 <input
                   type="text"
-                  className="form-control form-control-lg"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter your name"
+                  value={tempName}
+                  onChange={(e) => setTempName(e.target.value)}
                   required
                 />
               </div>
-
-              <button type="submit" className="btn btn-primary btn-lg w-100 mb-4">
-                Update Profile
-              </button>
-
-              <button
-                onClick={handleLogout}
-                className="btn btn-danger btn-lg w-100"
-              >
-                Logout
-              </button>
-            </form>
+            </div>
           </div>
-        </div>
-      </div>
+
+          <div className="form-section">
+            <h2>Progress</h2>
+            <div className="progress-container">
+              <div className="progress-item">
+                <span>Daily Points: </span>
+                <div className="progress-bar">
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${
+                        (userProfile.points?.current /
+                          userProfile.points?.total) *
+                        100
+                      }%`,
+                    }}
+                  ></div>
+                  <span className="progress-text">
+                    {userProfile.points?.current} / {userProfile.points?.total}
+                  </span>
+                </div>
+              </div>
+              <div className="progress-item">
+                <span>Monthly Points: </span>
+                <div className="progress-bar">
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${
+                        (userProfile.Mpoints?.current /
+                          userProfile.Mpoints?.total) *
+                        100
+                      }%`,
+                    }}
+                  ></div>
+                  <span className="progress-text">
+                    {userProfile.Mpoints?.current} /{" "}
+                    {userProfile.Mpoints?.total}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" className="submit-btn">
+            Save Profile
+          </button>
+          <button
+            type="button"
+            className="submit-btn"
+            onClick={handleSyncNow}
+            style={{ background: "#28a745", marginTop: "10px" }}
+          >
+            Sync Now
+          </button>
+        </form>
+      </main>
     </div>
   );
 };

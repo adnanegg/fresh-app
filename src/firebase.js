@@ -1,14 +1,14 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth";
 import { getDatabase } from "firebase/database"; // Correct import for Realtime Database
 import { getStorage } from "firebase/storage";
 
-
-
-
-
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,// process.env.REACT_APP_FIREBASE_API_KEY,
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY, // process.env.REACT_APP_FIREBASE_API_KEY,
   authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
   databaseURL: process.env.REACT_APP_FIREBASE_DATABASE_URL,
   projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
@@ -22,4 +22,12 @@ const database = getDatabase(app);
 const auth = getAuth(app);
 const storage = getStorage(app); // Initialize Firebase Storage
 
-export { auth, database,storage };
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log("Firebase Auth persistence set to local storage");
+  })
+  .catch((error) => {
+    console.error("Error setting persistence:", error);
+  });
+
+export { auth, database, storage };

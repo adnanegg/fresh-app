@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { auth, database } from "../firebase";
 import { signOut } from "firebase/auth";
 import { useNavigate, Link } from "react-router-dom";
-import { ref, onValue, update } from "firebase/database";
+import { ref, get, update } from "firebase/database";
 import Swal from "sweetalert2";
 import "./styles/style.css";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -10,612 +10,674 @@ import "bootstrap-icons/font/bootstrap-icons.css";
 
 const BONUS_POINTS = 10;
 const BOOSTS = {
-  "5xBonus": { multiplier: 5, type: "bonus", description: "Multiplies Points by 5" },
-  "DoubleEverything": { multiplier: 2, type: "all", description: "Doubles Points for this task" },
-  "+30Percent": { percentage: 0.3, type: "all", description: "Increases Points by 30% for this task" },
+  DoubleEverything: {
+    multiplier: 2,
+    type: "all",
+    description: "Doubles Points for this task",
+  },
+  "+30Percent": {
+    percentage: 0.3,
+    type: "all",
+    description: "Increases Points by 30% for this task",
+  },
+  TheSavior: {
+    type: "savior",
+    description: "Enables multiple completions per day",
+  },
+  DoubleOrDie: {
+    multiplier: 2,
+    type: "doubleOrDie",
+    description: "Doubles points if completed, -10 if missed by reset",
+  },
+  PerfectBonus: {
+    bonus: 50,
+    type: "perfectBonus",
+    description: "Sets perfect completion bonus to 50 points",
+  },
 };
 
-const NormalMode = () => {
+const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
   const navigate = useNavigate();
-  const [userProfile, setUserProfile] = useState({ name: "User", photo: "profile-images/default-profile.png" });
-  const [tasks, setTasks] = useState([]);
-  const [completedTasks, setCompletedTasks] = useState([]);
-  const [pointsData, setPointsData] = useState({ current: 0, total: 900 });
-  const [MpointsData, setMpointsData] = useState({ current: 0, total: 3000 });
+  const userId = auth.currentUser?.uid;
+  const [userData, setUserData] = useState(() => {
+    const storedData = localStorage.getItem(`userData_${userId}`);
+    const parsedData = storedData ? JSON.parse(storedData) : {};
+    const cachedGlobalTasks =
+      JSON.parse(localStorage.getItem("globalTasks")) || globalTasks;
+
+    let initialTasks = [];
+    if (parsedData.tasks && typeof parsedData.tasks === "object") {
+      initialTasks = Object.keys(cachedGlobalTasks).map((taskId) => ({
+        ...cachedGlobalTasks[taskId],
+        taskId,
+        completionCount: parsedData.tasks[taskId]?.completionCount || 0,
+        dailyCounter: parsedData.tasks[taskId]?.dailyCounter || 0,
+        boost: parsedData.tasks[taskId]?.boost || null,
+        hasTimesOption:
+          parsedData.tasks[taskId]?.hasTimesOption ||
+          cachedGlobalTasks[taskId]?.hasTimesOption ||
+          false,
+        selectedMode: parsedData.tasks[taskId]?.selectedMode || "normal",
+      }));
+    } else {
+      initialTasks = Object.keys(cachedGlobalTasks).map((taskId) => ({
+        ...cachedGlobalTasks[taskId],
+        taskId,
+        completionCount: 0,
+        dailyCounter: 0,
+        boost: null,
+        hasTimesOption: cachedGlobalTasks[taskId].hasTimesOption || false,
+        selectedMode: "normal",
+      }));
+    }
+
+    return {
+      profile: parsedData.profile || { name: "User" },
+      points: parsedData.points || { current: 0, total: 4500 },
+      Mpoints: parsedData.Mpoints || { current: 0, total: 12000 },
+      tasks: initialTasks,
+      completedTasks: Array.isArray(parsedData.completedTasks)
+        ? parsedData.completedTasks
+        : [],
+      lastUpdated: parsedData.lastUpdated || Date.now(),
+    };
+  });
   const [notifications, setNotifications] = useState([]);
   const [openSections, setOpenSections] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedTaskIndex, setSelectedTaskIndex] = useState("");
   const [selectedBoost, setSelectedBoost] = useState("");
   const [taskTimes, setTaskTimes] = useState({});
-  const [lastResetCheck, setLastResetCheck] = useState(Date.now()); // For reset timing
+  const [isCompletedTasksOpen, setIsCompletedTasksOpen] = useState(false);
 
-  // Testing state (for simulation)
-
-  const groupTasksByCategory = (tasks) => {
-    return tasks.reduce((acc, task) => {
+  const groupedTasks = useMemo(() => {
+    if (!Array.isArray(userData.tasks)) return {};
+    return userData.tasks.reduce((acc, task) => {
       if (!acc[task.category]) acc[task.category] = [];
       acc[task.category].push(task);
       return acc;
     }, {});
-  };
+  }, [userData.tasks]);
 
-  useEffect(() => {
-    let unsubscribe;
-    const fetchUserData = async (userId) => {
-      setIsLoading(true);
-      const userRef = ref(database, `users/${userId}`);
-      unsubscribe = onValue(userRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          setUserProfile(data.profile || { name: "User", photo: "/profile-photos/default-profile.png" });
-          setTasks(data.tasks || []);
-          setCompletedTasks(data.completedTasks || []);
-          setPointsData(data.points || { current: 0, total: 900 });
-          setMpointsData(data.Mpoints || { current: 0, total: 3000 });
+  // Debounced syncWithFirebase to prevent rapid calls
+  const syncWithFirebase = useCallback(
+    async (forceSync = false) => {
+      if (!userId) return;
+      const localData =
+        JSON.parse(localStorage.getItem(`userData_${userId}`)) || {};
+      if (!forceSync && localData.lastUpdated === userData.lastUpdated) return; // Skip if no changes
+
+      try {
+        if (localData.tasks && localData.points) {
+          const tasksToSync = Object.fromEntries(
+            localData.tasks.map((task) => [
+              task.taskId,
+              {
+                completionCount: task.completionCount,
+                dailyCounter: task.dailyCounter,
+                boost: task.boost,
+                hasTimesOption: task.hasTimesOption,
+                selectedMode: task.selectedMode,
+              },
+            ])
+          );
+          await update(ref(database, `users/${userId}`), {
+            ...localData,
+            tasks: tasksToSync,
+            lastUpdated: Date.now(),
+          });
         }
-        setIsLoading(false);
-      }, (error) => {
-        console.error("Firebase error:", error);
-        setIsLoading(false);
-      });
+      } catch (error) {
+        Swal.fire({
+          icon: "error",
+          title: "Sync Failed",
+          text: `Failed to sync data: ${error.message}. Your changes are saved locally.`,
+        });
+        throw error;
+      }
+    },
+    [userId, userData.lastUpdated]
+  );
+
+  useEffect(() => {
+    if (!userId) {
+      navigate("/login");
+      return;
+    }
+
+    const initializeUserData = async () => {
+      try {
+        const userRef = ref(database, `users/${userId}`);
+        const snapshot = await get(userRef);
+        const firebaseData = snapshot.val() || {};
+        const cachedGlobalTasks =
+          JSON.parse(localStorage.getItem("globalTasks")) || globalTasks;
+        const initialTasks = Object.keys(cachedGlobalTasks).map((taskId) => {
+          const userTask = firebaseData.tasks?.[taskId] || {};
+          return {
+            ...cachedGlobalTasks[taskId],
+            taskId,
+            completionCount: userTask.completionCount || 0,
+            dailyCounter: userTask.dailyCounter || 0,
+            boost: userTask.boost || null,
+            hasTimesOption:
+              userTask.hasTimesOption ||
+              cachedGlobalTasks[taskId]?.hasTimesOption ||
+              false,
+            selectedMode: userTask.selectedMode || "normal",
+          };
+        });
+
+        const initialUserData = {
+          profile: firebaseData.profile || { name: "User" },
+          points: firebaseData.points || { current: 0, total: 4500 },
+          Mpoints: firebaseData.Mpoints || { current: 0, total: 12000 },
+          tasks: initialTasks,
+          completedTasks: Array.isArray(firebaseData.completedTasks)
+            ? firebaseData.completedTasks
+            : [],
+          lastUpdated: firebaseData.lastUpdated || Date.now(),
+        };
+
+        localStorage.setItem(
+          `userData_${userId}`,
+          JSON.stringify(initialUserData)
+        );
+        setUserData(initialUserData);
+        setOpenSections(
+          Object.keys(groupedTasks).reduce(
+            (acc, category) => ({ ...acc, [category]: category === "Task" }),
+            {}
+          )
+        );
+      } catch (error) {
+        console.error("Initialization error:", error);
+        const storedData = localStorage.getItem(`userData_${userId}`);
+        if (storedData) setUserData(JSON.parse(storedData));
+      }
     };
 
-    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
-      if (!user) navigate("/login");
-      else fetchUserData(user.uid);
-    });
+    initializeUserData();
 
+    // Cleanup only runs on unmount, not on every dependency change
     return () => {
-      if (unsubscribe) unsubscribe();
-      if (unsubscribeAuth) unsubscribeAuth();
+      syncWithFirebase(true); // Force sync on unmount (e.g., logout)
     };
-  }, [navigate]);
+  }, [navigate, userId, globalTasks]); // Removed groupedTasks and userData from dependencies
 
-  // Reset Logic
-  const checkAndResetTasks = useCallback(async () => {
-    const now = new Date();
-    const localTime = now.getTime() - now.getTimezoneOffset() * 60000; // Adjust to local time
-    const localNow = new Date(localTime);
+  const updateLocalData = useCallback(
+    (newData) => {
+      const updatedData = { ...userData, ...newData, lastUpdated: Date.now() };
+      localStorage.setItem(`userData_${userId}`, JSON.stringify(updatedData));
+      setUserData(updatedData);
+      syncWithFirebase(); // Sync after meaningful updates
+    },
+    [userData, syncWithFirebase, userId]
+  );
 
-    const userId = auth.currentUser?.uid;
-    if (!userId) return;
+  const toggleSection = useCallback(
+    (category) =>
+      setOpenSections((prev) => ({ ...prev, [category]: !prev[category] })),
+    []
+  );
 
-    const userRef = ref(database, `users/${userId}`);
-
-    // Daily Reset: 6 AM
-    const today6AM = new Date(localNow);
-    today6AM.setHours(6, 0, 0, 0);
-    const nextDay6AM = new Date(today6AM);
-    nextDay6AM.setDate(today6AM.getDate() + 1);
-
-    if (localNow >= today6AM && lastResetCheck < today6AM.getTime()) {
-      const newTasks = [...tasks, ...completedTasks];
-      try {
-        await update(userRef, {
-          tasks: newTasks,
-          completedTasks: [],
-        });
-        setTasks(newTasks);
-        setCompletedTasks([]);
-        setLastResetCheck(nextDay6AM.getTime()); // Update to next day's 6 AM
-        console.log("Daily reset at 6 AM");
-      } catch (error) {
-        console.error("Daily reset failed:", error);
-      }
-    }
-
-    // Weekly Reset: Saturday 6 AM
-    const dayOfWeek = localNow.getDay(); // 0 = Sunday, 6 = Saturday
-    const isSaturday = dayOfWeek === 6;
-    const saturday6AM = new Date(localNow);
-    saturday6AM.setHours(6, 0, 0, 0);
-    while (saturday6AM.getDay() !== 6) {
-      saturday6AM.setDate(saturday6AM.getDate() - 1);
-    }
-    const nextSaturday6AM = new Date(saturday6AM);
-    nextSaturday6AM.setDate(saturday6AM.getDate() + 7);
-
-    if (isSaturday && localNow >= saturday6AM && lastResetCheck < saturday6AM.getTime()) {
-      const resetTasks = tasks.map((task) => ({ ...task, completionCount: 0 }));
-      try {
-        await update(userRef, {
-          tasks: resetTasks,
-          completedTasks: [],
-        });
-        setTasks(resetTasks);
-        setCompletedTasks([]);
-        setLastResetCheck(nextSaturday6AM.getTime()); // Update to next Saturday's 6 AM
-        console.log("Weekly reset at Saturday 6 AM");
-      } catch (error) {
-        console.error("Weekly reset failed:", error);
-      }
-    }
-  }, [tasks, completedTasks, lastResetCheck]);
-
-  // Check resets every minute (or on simulateTime change)
-  useEffect(() => {
-    checkAndResetTasks(); // Initial check
-    const interval = setInterval(checkAndResetTasks, 1000); // Check every minute
-    return () => clearInterval(interval);
-  }, [checkAndResetTasks]);
-
-  const groupedTasks = useMemo(() => groupTasksByCategory(tasks), [tasks]);
-
-  useEffect(() => {
-    const initialSections = Object.keys(groupedTasks).reduce((acc, category) => ({
-      ...acc,
-      [category]: category === "Task",
-    }), {});
-    setOpenSections(initialSections);
-  }, [groupedTasks]);
-
-  const toggleSection = useCallback((category) => {
-    setOpenSections((prev) => ({ ...prev, [category]: !prev[category] }));
-  }, []);
-
-  const handleModeChange = useCallback(async (index, newMode) => {
-    const updatedTasks = [...tasks];
-    updatedTasks[index] = { ...updatedTasks[index], selectedMode: newMode };
-    setTasks(updatedTasks);
-    const userId = auth.currentUser?.uid;
-    if (userId) {
-      const userRef = ref(database, `users/${userId}/tasks/${index}`);
-      await update(userRef, { selectedMode: newMode });
-    }
-  }, [tasks]);
-
-  
+  const handleModeChange = useCallback(
+    (index, newMode) => {
+      const updatedTasks = userData.tasks.map((t, i) =>
+        i === index ? { ...t, selectedMode: newMode } : t
+      );
+      updateLocalData({ tasks: updatedTasks });
+    },
+    [userData.tasks, updateLocalData]
+  );
 
   const applyBoost = useCallback(async () => {
     if (selectedTaskIndex === "" || !selectedBoost) {
       Swal.fire({
         icon: "warning",
         title: "Selection Required",
-        text: "Please select a task and a boost to apply.",
-        confirmButtonText: "OK",
+        text: "Please select a task and a boost.",
       });
       return;
     }
-
-    const task = tasks[selectedTaskIndex];
+    const task = userData.tasks[selectedTaskIndex];
     if (task.boost) {
       Swal.fire({
         icon: "warning",
         title: "Boost Already Applied",
-        text: `A boost (${task.boost}) is already applied to "${task.name}". Remove it first.`,
-        confirmButtonText: "OK",
+        text: `A boost (${task.boost}) is already applied to "${task.name}".`,
       });
       return;
     }
-
     const result = await Swal.fire({
       title: `Apply ${selectedBoost}?`,
       text: BOOSTS[selectedBoost].description,
       icon: "question",
       showCancelButton: true,
-      confirmButtonText: "Apply",
-      cancelButtonText: "Cancel",
     });
-
     if (result.isConfirmed) {
-      const updatedTasks = tasks.map((t, i) =>
-        i === Number(selectedTaskIndex) ? { ...t, boost: selectedBoost } : t
+      const updatedTasks = userData.tasks.map((t, i) =>
+        i === Number(selectedTaskIndex)
+          ? {
+              ...t,
+              boost: selectedBoost,
+              hasTimesOption:
+                selectedBoost === "TheSavior" ? true : t.hasTimesOption,
+            }
+          : t
       );
-      setTasks(updatedTasks);
-      const userId = auth.currentUser?.uid;
-      if (userId) {
-        const userRef = ref(database, `users/${userId}/tasks/${selectedTaskIndex}`);
-        await update(userRef, { boost: selectedBoost });
-      }
-      setSelectedTaskIndex("");
-      setSelectedBoost("");
+      updateLocalData({ tasks: updatedTasks });
       Swal.fire({
         icon: "success",
         title: "Boost Applied!",
         text: `Boost ${selectedBoost} applied to ${task.name}.`,
       });
     }
-  }, [tasks, selectedTaskIndex, selectedBoost]);
+    setSelectedTaskIndex("");
+    setSelectedBoost("");
+  }, [userData.tasks, selectedTaskIndex, selectedBoost, updateLocalData]);
 
-  const removeBoost = useCallback(async (index) => {
-    const task = tasks[index];
-    if (!task.boost) {
-      Swal.fire({
-        icon: "warning",
-        title: "No Boost",
-        text: `No boost is applied to "${task.name}".`,
-        confirmButtonText: "OK",
-      });
-      return;
-    }
-
-    const result = await Swal.fire({
-      title: "Remove Boost?",
-      text: `Remove ${task.boost} from "${task.name}"?`,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Remove",
-      cancelButtonText: "Cancel",
-    });
-
-    if (result.isConfirmed) {
-      const updatedTasks = tasks.map((t, i) =>
-        i === index ? { ...t, boost: null } : t
-      );
-      setTasks(updatedTasks);
-      const userId = auth.currentUser?.uid;
-      if (userId) {
-        const userRef = ref(database, `users/${userId}/tasks/${index}`);
-        await update(userRef, { boost: null });
-      }
-      Swal.fire({
-        icon: "success",
-        title: "Boost Removed!",
-        text: `Boost removed from ${task.name}.`,
-      });
-    }
-  }, [tasks]);
-
-  const handleTimesChange = useCallback((index, value) => {
-    setTaskTimes((prev) => ({ ...prev, [index]: Math.max(1, parseInt(value) || 1) }));
-  }, []);
-
-  const completeTask = useCallback(async (index) => {
-    const task = tasks[index];
-    if (!task || typeof task.points !== "number") {
-      console.error("Invalid task or points:", task);
-      return;
-    }
-  
-    if (task.completionCount >= task.numberLimit) {
-      Swal.fire({
-        icon: "warning",
-        title: "Task Limit Reached",
-        text: `You have completed "${task.name}" the maximum number of times.`,
-        confirmButtonText: "OK",
-      });
-      return;
-    }
-  
-    const times = task.hasTimesOption ? (taskTimes[index] || 1) : 1;
-    const newCompletionCount = task.completionCount + times;
-    if (newCompletionCount > task.numberLimit) {
-      Swal.fire({
-        icon: "warning",
-        title: "Exceeds Limit",
-        text: `Completing ${times} times exceeds the limit of ${task.numberLimit}.`,
-        confirmButtonText: "OK",
-      });
-      return;
-    }
-  
-    const updatedTask = { ...task, completionCount: newCompletionCount };
-    const newTasks = tasks.filter((_, i) => i !== index);
-    let newCompletedTasks = [...completedTasks];
-    let effectivePoints = task.points; // Base points
-    if (task.hasExceptionalOption && task.selectedMode === "exceptional") {
-      effectivePoints = task.points / 2;
-    }
-    let bonusPoints = 0;
-  
-    if (task.boost) {
-      const boost = BOOSTS[task.boost];
-      if (boost.type === "all") {
-        if (boost.multiplier) effectivePoints *= boost.multiplier;
-        else if (boost.percentage) effectivePoints *= (1 + boost.percentage);
-      } else if (boost.type === "bonus") {
-        effectivePoints *= boost.multiplier;
-      }
-    }
-  
-    const totalPoints = effectivePoints * times;
-    if (newCompletionCount === task.numberLimit) {
-      bonusPoints = BONUS_POINTS;
-    }
-  
-    const existingCompletedTaskIndex = newCompletedTasks.findIndex((t) => t.name === task.name);
-    if (existingCompletedTaskIndex === -1) {
-      const newEntry = {
-        name: task.name,
-        basePoints: task.points, // Store original points
-        points: totalPoints, // Boosted total
-        completionCount: times,
-        bonusPoints: bonusPoints,
-        selectedMode: task.selectedMode || "normal",
-        boost: task.boost || null,
-        numberLimit: task.numberLimit,
-        hasTimesOption: task.hasTimesOption,
-        category: task.category || "Task",
-      };
-      if (task.hasTimesOption) {
-        newEntry.times = times;
-      }
-      newCompletedTasks.push(newEntry);
-    } else {
-      const existingTask = newCompletedTasks[existingCompletedTaskIndex];
-      const updatedEntry = {
-        ...existingTask,
-        basePoints: existingTask.basePoints || task.points, // Preserve base points
-        points: existingTask.points + totalPoints,
-        completionCount: existingTask.completionCount + times,
-        bonusPoints: newCompletionCount === task.numberLimit ? BONUS_POINTS : existingTask.bonusPoints || 0,
-      };
-      if (task.hasTimesOption) {
-        updatedEntry.times = (existingTask.times || 0) + times;
-      }
-      newCompletedTasks[existingCompletedTaskIndex] = updatedEntry;
-    }
-  
-    const newPointsData = { ...pointsData, current: pointsData.current + totalPoints + bonusPoints };
-    const newMpointsData = { ...MpointsData, current: MpointsData.current + totalPoints + bonusPoints };
-  
-    const userId = auth.currentUser?.uid;
-    if (userId) {
-      const userRef = ref(database, `users/${userId}`);
-      const now = new Date();
-      const dateStr = now.toISOString().split("T")[0];
-      const taskHistoryRef = ref(database, `users/${userId}/taskHistory/${dateStr}`);
-      onValue(taskHistoryRef, (snapshot) => {
-        const history = snapshot.val() || {};
-        let updatedHistory = { ...history };
-        if (task.frequencyUnit === "days") {
-          updatedHistory[task.name] = { completed: true };
-        } else if (task.frequencyUnit === "times") {
-          updatedHistory[task.name] = { completions: (history[task.name]?.completions || 0) + times };
-        }
-        update(taskHistoryRef, updatedHistory);
-      }, { onlyOnce: true });
-  
-      try {
-        await update(userRef, {
-          tasks: newTasks,
-          completedTasks: newCompletedTasks,
-          points: newPointsData,
-          Mpoints: newMpointsData,
+  const removeBoost = useCallback(
+    async (index) => {
+      const task = userData.tasks[index];
+      if (!task.boost) {
+        Swal.fire({
+          icon: "warning",
+          title: "No Boost",
+          text: `No boost is applied to "${task.name}".`,
         });
-      } catch (error) {
-        console.error("Firebase update failed:", error);
         return;
       }
-    }
-  
-    setPointsData(newPointsData);
-    setMpointsData(newMpointsData);
-    setTasks(newTasks);
-    setCompletedTasks(newCompletedTasks);
-    setTaskTimes((prev) => { const { [index]: _, ...rest } = prev; return rest; });
-  }, [tasks, completedTasks, pointsData, MpointsData, taskTimes]);
+      const result = await Swal.fire({
+        title: "Remove Boost?",
+        text: `Remove ${task.boost} from "${task.name}"?`,
+        icon: "question",
+        showCancelButton: true,
+      });
+      if (result.isConfirmed) {
+        const updatedTasks = userData.tasks.map((t, i) =>
+          i === index
+            ? {
+                ...t,
+                boost: null,
+                hasTimesOption:
+                  task.boost === "TheSavior" ? false : t.hasTimesOption,
+              }
+            : t
+        );
+        updateLocalData({ tasks: updatedTasks });
+        Swal.fire({
+          icon: "success",
+          title: "Boost Removed!",
+          text: `Boost removed from ${task.name}.`,
+        });
+      }
+    },
+    [userData.tasks, updateLocalData]
+  );
 
-  const undoTask = useCallback(async (index) => {
-  const task = completedTasks[index];
-  const taskIndex = tasks.findIndex((t) => t.name === task.name);
-  const originalTask = taskIndex !== -1 ? tasks[taskIndex] : null;
+  const handleTimesChange = useCallback((index, value) => {
+    setTaskTimes((prev) => ({
+      ...prev,
+      [index]: value === "" ? "" : Math.max(1, parseInt(value) || 1),
+    }));
+  }, []);
 
-  const newCompletedTasks = [...completedTasks];
-  const newCompletionCount = Math.max(task.completionCount - 1, 0);
+  const completeTask = useCallback(
+    (index) => {
+      const task = userData.tasks[index];
+      if (!task || typeof task.points !== "number") return;
 
-  const effectivePointsPerTime = task.points / task.completionCount; // Points per completion
-  let pointsToSubtract = effectivePointsPerTime;
-  if (task.bonusPoints && task.bonusPoints > 0 && task.completionCount === task.numberLimit) {
-    pointsToSubtract += task.bonusPoints;
-  }
+      const times = task.hasTimesOption ? taskTimes[index] || 1 : 1;
+      if (task.dailyCounter + times > task.dailyLimit) {
+        Swal.fire({
+          icon: "warning",
+          title: "Daily Limit Reached",
+          text: `Daily limit of ${task.dailyLimit} reached for "${task.name}".`,
+        });
+        return;
+      }
+      if (task.completionCount >= task.numberLimit) {
+        Swal.fire({
+          icon: "warning",
+          title: "Task Limit Reached",
+          text: `"${task.name}" completed max times (${task.numberLimit}).`,
+        });
+        return;
+      }
+      const newCompletionCount = task.completionCount + times;
+      if (newCompletionCount > task.numberLimit) {
+        Swal.fire({
+          icon: "warning",
+          title: "Exceeds Limit",
+          text: `Completing ${times} times exceeds limit of ${task.numberLimit}.`,
+        });
+        return;
+      }
 
-  if (newCompletionCount > 0) {
-    const updatedEntry = {
-      ...task,
-      completionCount: newCompletionCount,
-      points: task.points - effectivePointsPerTime,
-      bonusPoints: newCompletionCount === task.numberLimit - 1 ? 0 : task.bonusPoints || 0,
-    };
-    if (task.hasTimesOption) {
-      updatedEntry.times = Math.max((task.times || task.completionCount) - 1, 0);
-    }
-    newCompletedTasks[index] = updatedEntry;
-  } else {
-    newCompletedTasks.splice(index, 1);
-  }
+      let effectivePoints = task.points;
+      let bonusPoints = 0;
+      if (task.hasExceptionalOption) {
+        if (task.selectedMode === "exceptional")
+          effectivePoints = task.points / 2;
+        else if (task.selectedMode === "penalty")
+          effectivePoints = -(task.penaltyPoints || task.penalty || 10);
+      }
+      if (
+        task.boost &&
+        (!task.hasExceptionalOption || task.selectedMode !== "penalty")
+      ) {
+        const boost = BOOSTS[task.boost];
+        if (boost.multiplier) effectivePoints *= boost.multiplier;
+        else if (boost.percentage) effectivePoints *= 1 + boost.percentage;
+      }
+      const totalPoints = effectivePoints * times;
+      if (
+        newCompletionCount === task.numberLimit &&
+        (!task.hasExceptionalOption || task.selectedMode !== "penalty")
+      ) {
+        bonusPoints =
+          task.boost === "PerfectBonus"
+            ? BOOSTS["PerfectBonus"].bonus
+            : BONUS_POINTS;
+      }
 
-  const newTasks = originalTask
-    ? tasks.map((t, i) => (i === taskIndex ? { ...t, completionCount: Math.max(t.completionCount - 1, 0) } : t))
-    : [...tasks, {
+      const updatedTask = {
         ...task,
         completionCount: newCompletionCount,
-        points: task.basePoints || task.points, // Use original base points
-        bonusPoints: 0,
-        category: task.category || "Task",
-        selectedMode: task.selectedMode || "normal",
-        boost: task.boost || null,
-        numberLimit: task.numberLimit || 7,
-        hasTimesOption: task.hasTimesOption || false,
-        ...(task.hasTimesOption ? { times: 0 } : {}),
-      }];
+        dailyCounter: task.dailyCounter + times,
+      };
+      const newTasks = userData.tasks.map((t, i) =>
+        i === index ? updatedTask : t
+      );
+      const newCompletedTasks = [...userData.completedTasks];
+      const existingIndex = newCompletedTasks.findIndex(
+        (t) => t.name === task.name
+      );
 
-  const newPoints = Math.max(pointsData.current - pointsToSubtract, 0);
-  const newMpoints = Math.max(MpointsData.current - pointsToSubtract, 0);
-  const newPointsData = { ...pointsData, current: newPoints };
-  const newMpointsData = { ...MpointsData, current: newMpoints };
+      if (existingIndex === -1) {
+        newCompletedTasks.push({
+          name: task.name,
+          basePoints: task.points,
+          points: totalPoints,
+          completionCount: times,
+          bonusPoints,
+          boost: task.boost || null,
+          numberLimit: task.numberLimit,
+          hasTimesOption: task.hasTimesOption,
+          hasExceptionalOption: task.hasExceptionalOption || false,
+          category: task.category || "Task",
+          frequencyUnit: task.frequencyUnit || "days",
+          weeklyFrequency: task.weeklyFrequency || 1,
+          requiredCompletions: task.requiredCompletions || 1,
+          dailyLimit: task.dailyLimit,
+          dailyCounter: times,
+          penaltyPoints: task.penaltyPoints || task.penalty || 0,
+          ...(task.hasExceptionalOption
+            ? {
+                selectedMode: task.selectedMode || "normal",
+                isPenalty: task.selectedMode === "penalty",
+              }
+            : {}),
+          ...(task.hasTimesOption ? { times } : {}),
+        });
+      } else {
+        const existingTask = newCompletedTasks[existingIndex];
+        newCompletedTasks[existingIndex] = {
+          ...existingTask,
+          points: existingTask.points + totalPoints,
+          completionCount: existingTask.completionCount + times,
+          bonusPoints:
+            newCompletionCount === task.numberLimit && !existingTask.bonusPoints
+              ? bonusPoints
+              : existingTask.bonusPoints,
+          dailyCounter: existingTask.dailyCounter + times,
+        };
+      }
 
-  const userId = auth.currentUser?.uid;
-  if (userId) {
-    const userRef = ref(database, `users/${userId}`);
-    try {
-      await update(userRef, {
+      const newPointsData = {
+        ...userData.points,
+        current: Math.max(
+          userData.points.current + totalPoints + bonusPoints,
+          0
+        ),
+      };
+      const newMpointsData = {
+        ...userData.Mpoints,
+        current: Math.max(
+          userData.Mpoints.current + totalPoints + bonusPoints,
+          0
+        ),
+      };
+      updateLocalData({
         tasks: newTasks,
         completedTasks: newCompletedTasks,
         points: newPointsData,
         Mpoints: newMpointsData,
       });
-    } catch (error) {
-      console.error("Undo task failed:", error);
-      return;
-    }
-  }
 
-  setPointsData(newPointsData);
-  setMpointsData(newMpointsData);
-  setTasks(newTasks);
-  setCompletedTasks(newCompletedTasks);
-}, [tasks, completedTasks, pointsData, MpointsData]);
+      setTaskTimes((prev) => ({ ...prev, [index]: "" }));
+      setNotifications((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          position: `task-${index}`,
+          points: totalPoints + bonusPoints,
+        },
+      ]);
+      setTimeout(
+        () =>
+          setNotifications((prev) => prev.filter((n) => n.id !== Date.now())),
+        3000
+      );
+    },
+    [userData, taskTimes, updateLocalData]
+  );
 
-  const resetTaskCompletionCount = useCallback(async (index) => {
-    const task = tasks[index];
-    const updatedTask = { ...task, completionCount: 0 };
-    const newTasks = [...tasks];
-    newTasks[index] = updatedTask;
+  const undoTask = useCallback(
+    (index) => {
+      const task = userData.completedTasks[index];
+      const taskIndex = userData.tasks.findIndex((t) => t.name === task.name);
+      const originalTask = taskIndex !== -1 ? userData.tasks[taskIndex] : null;
 
-    const userId = auth.currentUser?.uid;
-    if (userId) {
-      const userRef = ref(database, `users/${userId}`);
-      await update(userRef, {
+      const newCompletionCount = Math.max(task.completionCount - 1, 0);
+      const newDailyCounter = Math.max(task.dailyCounter - 1, 0);
+      let pointsToAdjust = task.points / task.completionCount;
+      if (task.hasExceptionalOption) {
+        if (task.selectedMode === "penalty")
+          pointsToAdjust = -(task.penaltyPoints || task.penalty || 10);
+        else if (task.selectedMode === "exceptional")
+          pointsToAdjust = task.basePoints / 2;
+      }
+      if (task.bonusPoints && task.completionCount === task.numberLimit)
+        pointsToAdjust += task.bonusPoints;
+
+      const newCompletedTasks = [...userData.completedTasks];
+      if (newCompletionCount > 0) {
+        newCompletedTasks[index] = {
+          ...task,
+          completionCount: newCompletionCount,
+          points: task.points - pointsToAdjust,
+          dailyCounter: newDailyCounter,
+          bonusPoints:
+            newCompletionCount === task.numberLimit - 1 ? 0 : task.bonusPoints,
+          ...(task.hasTimesOption
+            ? { times: Math.max((task.times || task.completionCount) - 1, 0) }
+            : {}),
+        };
+      } else {
+        newCompletedTasks.splice(index, 1);
+      }
+
+      const newTasks = originalTask
+        ? userData.tasks.map((t, i) =>
+            i === taskIndex
+              ? {
+                  ...t,
+                  completionCount: Math.max(t.completionCount - 1, 0),
+                  dailyCounter: newDailyCounter,
+                }
+              : t
+          )
+        : userData.tasks;
+      const newPointsData = {
+        ...userData.points,
+        current: Math.max(userData.points.current - pointsToAdjust, 0),
+      };
+      const newMpointsData = {
+        ...userData.Mpoints,
+        current: Math.max(userData.Mpoints.current - pointsToAdjust, 0),
+      };
+      updateLocalData({
         tasks: newTasks,
-      });
-    }
-
-    setTasks(newTasks);
-
-    Swal.fire({
-      icon: "success",
-      title: "Task Reset",
-      text: `"${task.name}" has been reset. You can now complete it again.`,
-      confirmButtonText: "OK",
-    });
-  }, [tasks]);
-
-  const resetCompletedTasks = useCallback(async () => {
-    const userId = auth.currentUser?.uid;
-    if (!userId) return;
-
-    const updatedTasks = tasks.map((task) => ({
-      ...task,
-      completionCount: 0,
-    }));
-
-    const newCompletedTasks = [];
-
-    if (userId) {
-      const userRef = ref(database, `users/${userId}`);
-      await update(userRef, {
-        tasks: updatedTasks,
         completedTasks: newCompletedTasks,
+        points: newPointsData,
+        Mpoints: newMpointsData,
       });
-    }
+    },
+    [userData, updateLocalData]
+  );
 
-    setPointsData({ current: 0, total: 900 });
-    setMpointsData({ current: 0, total: 3000 });
-    setTasks(updatedTasks);
-    setCompletedTasks(newCompletedTasks);
+  const resetTaskCompletionCount = useCallback(
+    (index) => {
+      const task = userData.tasks[index];
+      const updatedTasks = userData.tasks.map((t, i) =>
+        i === index ? { ...t, completionCount: 0, dailyCounter: 0 } : t
+      );
+      updateLocalData({ tasks: updatedTasks });
+      Swal.fire({
+        icon: "success",
+        title: "Task Reset",
+        text: `"${task.name}" has been reset.`,
+      });
+    },
+    [userData.tasks, updateLocalData]
+  );
 
+  const resetCompletedTasks = useCallback(() => {
+    const taskMap = new Map();
+    userData.completedTasks.forEach((completedTask) =>
+      taskMap.set(completedTask.name, { ...completedTask, dailyCounter: 0 })
+    );
+    const resetTasks = userData.tasks.map((task) =>
+      taskMap.get(task.name) ? { ...task, dailyCounter: 0 } : task
+    );
+    updateLocalData({ tasks: resetTasks, completedTasks: [] });
     Swal.fire({
       icon: "success",
       title: "Tasks Reset!",
-      text: "All completed tasks have been reset.",
-      confirmButtonText: "OK",
+      text: "All tasks returned to Daily Tasks.",
     });
-  }, [tasks]);
+  }, [userData, updateLocalData]);
+
+  const resetAllTaskCompletionCount = useCallback(() => {
+    const resetTasks = userData.tasks.map((task) => ({
+      ...task,
+      completionCount: 0,
+      dailyCounter: 0,
+    }));
+    updateLocalData({ tasks: resetTasks });
+    Swal.fire({
+      icon: "success",
+      title: "All Tasks Reset!",
+      text: "All task completions reset to 0.",
+    });
+  }, [userData.tasks, updateLocalData]);
 
   const resetPointsBar = useCallback(() => {
-    const newPointsData = { current: 0, total: 900 };
-    const userId = auth.currentUser?.uid;
-    if (userId) {
-      const userRef = ref(database, `users/${userId}`);
-      update(userRef, {
-        points: newPointsData,
-      });
-    }
-    console.log("hello?")
-    setPointsData(newPointsData);
-
+    const newPointsData = { current: 0, total: 4500 };
+    updateLocalData({ points: newPointsData });
     Swal.fire({
       icon: "success",
       title: "Points Bar Reset!",
-      text: "The points bar has been reset to 0.",
-      confirmButtonText: "OK",
+      text: "Points reset to 0.",
     });
-  }, []);
+  }, [updateLocalData]);
 
   const resetMonthlyPointsBar = useCallback(() => {
-    const newMpointsData = { current: 0, total: 3000 };
-    const userId = auth.currentUser?.uid;
-    if (userId) {
-      const userRef = ref(database, `users/${userId}`);
-      update(userRef, {
-        Mpoints: newMpointsData,
-      });
-    }
-
-    setMpointsData(newMpointsData);
-
+    const newMpointsData = { current: 0, total: 12000 };
+    updateLocalData({ Mpoints: newMpointsData });
     Swal.fire({
       icon: "success",
-      title: "Monthly Points Bar Reset!",
-      text: "The Monthly points bar has been reset to 0.",
-      confirmButtonText: "OK",
+      title: "Monthly Points Reset!",
+      text: "Monthly points reset to 0.",
     });
-  }, []);
+  }, [updateLocalData]);
 
   const handleLogout = useCallback(async () => {
-    await signOut(auth);
-    navigate("/signup");
-  }, [navigate]);
+    setIsLoading(true);
+    try {
+      await syncWithFirebase(true); // Force sync on logout
+      await signOut(auth);
+      localStorage.removeItem(`userData_${userId}`);
+      navigate("/login");
+    } catch (error) {
+      // Error already shown in syncWithFirebase
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate, syncWithFirebase, userId]);
 
-  
+  const startTheWeek = useCallback(() => {
+    const resetTasks = userData.tasks.map((task) => ({
+      ...task,
+      completionCount: 0,
+      dailyCounter: 0,
+    }));
+    const newPointsData = { current: 0, total: 4500 };
+    updateLocalData({
+      tasks: resetTasks,
+      completedTasks: [],
+      points: newPointsData,
+    });
+    Swal.fire({
+      icon: "success",
+      title: "Week Started!",
+      text: "All tasks, completions, and points reset.",
+    });
+  }, [userData, updateLocalData]);
+
+  const startTheDay = useCallback(() => {
+    const taskMap = new Map();
+    userData.completedTasks.forEach((completedTask) =>
+      taskMap.set(completedTask.name, { ...completedTask, dailyCounter: 0 })
+    );
+    const resetTasks = userData.tasks.map((task) =>
+      taskMap.get(task.name) ? { ...task, dailyCounter: 0 } : task
+    );
+    updateLocalData({ tasks: resetTasks, completedTasks: [] });
+    Swal.fire({
+      icon: "success",
+      title: "Day Started!",
+      text: "Daily tasks reset.",
+    });
+  }, [userData, updateLocalData]);
+
+  const getProgressColor = (current, total) => {
+    const percentage = (current / total) * 100;
+    if (percentage >= 75) return "#28a745";
+    if (percentage >= 25) return "#ffc107";
+    return "#dc3545";
+  };
 
   const styles = {
     containerFluid: { padding: 0 },
-    logo: {
-      width: "40px",
-      height: "40px",
-      marginRight: "10px",
-    },
-    topBar: {
-      position: "fixed", // Or "relative" if you want it to scroll with content
-      top: 0,
-      width: "100%",
-      height: "60px",
-      backgroundColor: "#ffc107",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-around",
-      zIndex: 1000,
-      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-    },
-    topBarLink: {
-      textDecoration: "none",
-      color: "#666",
-      fontSize: "16px",
-      padding: "0 15px",
-      display: "flex",
-      alignItems: "center",
-      transition: "color 0.3s ease",
-    },
-    topBarIcon: {
-      fontSize: "20px",
-      marginRight: "8px",
-      color: "#666",
-      transition: "color 0.3s ease",
-    },
-    dashboardContent: {
-      marginTop: "60px", // Space for the top bar
-      transition: "none", // Remove transition since no expansion/contraction
-      flex: 1,
-      zIndex :10
-    },
+    dashboardContent: { marginTop: "60px", flex: 1, zIndex: 10 },
     dashboardCard: {
       borderRadius: "8px",
-      border: "1px solid #e9ecef",
       background: "none",
+      boxShadow: "none",
     },
-    cardBody: {
-      padding: "12px",
-    },
-    cardTitle: {
-      fontSize: "14px",
-      fontWeight: 600,
-    },
-    listGroupItem: {
-      backgroundColor: "transparent",
-      border: "none",
+    cardBody: { padding: "12px" },
+    cardTitle: { fontSize: "14px", fontWeight: 600 },
+    listGroupItem: { backgroundColor: "transparent", border: "none" },
+    penaltyListGroupItem: {
+      backgroundColor: "rgba(139, 0, 0, 0.1)",
+      border: "1px solid #8b0000",
+      color: "#ff4040",
+      fontWeight: "bold",
+      padding: "8px",
+      borderRadius: "4px",
     },
     formSelectSm: {
       fontSize: "12px",
@@ -636,38 +698,21 @@ const NormalMode = () => {
       textAlign: "center",
       padding: "15px",
       borderRadius: "8px",
-      background: "linear-gradient(135deg, #ff6b6b, #007bff)", // Red to blue gradient
+      background: "linear-gradient(135deg, #ff6b6b, #007bff)",
       boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-      transition: "background 0.3s ease, transform 0.3s ease",
-      position: "relative",
-      overflow: "hidden",
     },
     monthlyPointsProgress: {
       textAlign: "center",
       padding: "15px",
       borderRadius: "8px",
-      background: "linear-gradient(135deg, #ff6b6b, #ffc107)", // Red to yellow gradient
+      background: "linear-gradient(135deg, #ff6b6b, #ffc107)",
       boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-      transition: "background 0.3s ease, transform 0.3s ease",
-      position: "relative",
-      overflow: "hidden",
     },
-    progressText: {
-      fontSize: "24px",
-      fontWeight: "bold",
-      color: "white",
-      textShadow: "1px 1px 3px rgba(0, 0, 0, 0.3)",
-      marginBottom: "10px",
-    },
+    progressText: { fontSize: "24px", fontWeight: "bold", color: "white" },
     progressIcon: {
       fontSize: "30px",
       marginBottom: "10px",
       animation: "pulse 2s infinite ease-in-out",
-    },
-    profileAvatar: {
-      position: "relative",
-      display: "inline-block",
-      paddingLeft: "10px",
     },
     videoBackground: {
       position: "fixed",
@@ -684,143 +729,142 @@ const NormalMode = () => {
       left: 0,
       width: "100%",
       height: "100%",
-      backgroundColor: "rgba(0, 0, 0, 0)", // Transparent to show the video
+      backgroundColor: "rgba(0, 0, 0, 0)",
       zIndex: -2,
     },
-    sidebarProfileIcon: { width: "40px", height: "40px", border: "2px solid #007bff" },
     timesInput: {
-      width: "60px",
-      padding: "4px",
-      fontSize: "12px",
-      borderRadius: "4px",
-      marginLeft: "5px",
+      width: "80px",
+      padding: "8px",
+      fontSize: "16px",
+      borderRadius: "6px",
+      marginLeft: "10px",
     },
-    resetButton: {
-      margin: "5px",
-      padding: "5px 10px",
-      backgroundColor: "#ff9800",
+    startWeekButton: {
+      margin: "10px",
+      padding: "10px 20px",
+      backgroundColor: "#28a745",
       color: "white",
       border: "none",
-      borderRadius: "4px",
+      borderRadius: "6px",
     },
-
+    startDayButton: {
+      margin: "10px",
+      padding: "10px 20px",
+      backgroundColor: "#007bff",
+      color: "white",
+      border: "none",
+      borderRadius: "6px",
+    },
+    normalmodenav: {
+      position: "fixed",
+      top: 0,
+      width: "100%",
+      background: "#ffc107",
+      padding: "1rem 2rem",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      zIndex: 1000,
+    },
+    profileSection: {
+      position: "relative",
+      padding: "10px 0",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    },
   };
 
-  // Animations for creativity
   const stylesString = `
-    @keyframes popUp {
-      0% { opacity: 0; transform: translateY(-10px); }
-      50% { opacity: 1; transform: translateY(0); }
-      100% { opacity: 0; transform: translateY(-10px); }
-    }
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-      100% { transform: scale(1); }
-    }
+    @keyframes popUp { 0% { opacity: 0; transform: translateY(-10px); } 50% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-10px); } }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
   `;
-
-  // Determine icon color based on progress
-  const getProgressColor = (current, total) => {
-    const percentage = (current / total) * 100;
-    if (percentage >= 75) return "#28a745"; // Green for high progress
-    if (percentage >= 25) return "#ffc107"; // Yellow for moderate progress
-    return "#dc3545"; // Red for low progress
-  };
 
   return (
     <div style={styles.containerFluid}>
-      <video
-        autoPlay
-        loop
-        muted
-        style={styles.videoBackground}
-      >
-        <source src="/videos/backvideo2.mp4" type="video/mp4" />
-        Your browser does not support the video tag.
-      </video>
-
-      <div style={styles.videoOverlay}></div>
       <style>{stylesString}</style>
-      <div style={styles.topBar}>
-        <img src="/trackerLogo.png" alt="xAI Logo" style={styles.logo} />
-        <Link to="/dashboard" style={styles.topBarLink}>
-          <i className="bi bi-house-fill" style={styles.topBarIcon}></i>
-          Home
-        </Link>
-        <Link to="/leaderboard" style={styles.topBarLink}>
-          <i className="bi bi-trophy-fill" style={styles.topBarIcon}></i>
-          Leaderboard
-        </Link>
-        <Link to="/profile" style={styles.topBarLink}>
-          <i className="bi bi-person-fill" style={styles.topBarIcon}></i>
-          Profile
-        </Link>
-        <Link to="/statistics" style={styles.topBarLink}>
-          <i className="bi bi-bar-chart-fill" style={styles.topBarIcon}></i>
-          Statistics
-        </Link>
-        <Link to="/ranked-mode" style={styles.topBarLink}>
-          <i className="bi bi-shield-fill" style={styles.topBarIcon}></i>
-          Ranked Mode
-        </Link>
-        <Link to="/normal-mode" style={styles.topBarLink}>
-          <i className="bi bi-star-fill" style={styles.topBarIcon}></i>
-          Normal Mode
-        </Link>
-        <button onClick={handleLogout} style={styles.topBarLink} className="btn btn-link p-0">
-          <i className="bi bi-box-arrow-right-fill" style={styles.topBarIcon}></i>
-          Logout
-        </button>
-        <div style={styles.profileAvatar}>
-          <Link to="/profile">
-            <img
-              src={userProfile.photo || "/profile-images/default-profile.png"}
-              alt="Profile"
-              style={styles.sidebarProfileIcon}
-              className="rounded-circle"
-            />
-          </Link>
+      <nav style={styles.normalmodenav}>
+        <div className="nav-brand">
+          <img
+            src="/trackerLogo.png"
+            alt="Logo"
+            className="nav-logo"
+            loading="lazy"
+          />
+          <span className="nav-title">Normal Mode</span>
         </div>
-      </div>
+        <div className="nav-links">
+          <Link to="/dashboard" className="nav-link">
+            <i className="bi bi-house-fill"></i> Dashboard
+          </Link>
+          <Link to="/normal-mode" className="nav-link">
+            <i className="bi bi-star-fill"></i> Program
+          </Link>
+          <Link to="/statistics" className="nav-link">
+            <i className="bi bi-bar-chart-fill"></i> Statistics
+          </Link>
+          <button onClick={handleLogout} className="nav-logout">
+            <i className="bi bi-box-arrow-right"></i> Logout
+          </button>
+        </div>
+      </nav>
       <div style={styles.dashboardContent} className="col p-4">
         {isLoading ? (
-          <div className="text-center">Loading...</div>
+          <div className="text-center py-5">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Syncing...</span>
+            </div>
+            <p className="mt-2">Syncing with server...</p>
+          </div>
         ) : (
           <>
-            {/* Profile Section */}
-            <div className="row mb-4">
-              <div className="col-12">
+            <div className="row mb-4" style={styles.profileSection}>
+              <div className="col-12 col-md-6">
                 <div style={styles.dashboardCard} className="card shadow-sm">
-                  <div style={styles.cardBody} className="text-center p-3">
-                    <img
-                      src={userProfile.photo}
-                      alt="Profile"
-                      className="rounded-circle mb-2"
-                      style={{ width: "100px", height: "100px", objectFit: "cover" }}
-                    />
-                    <h4 style={styles.cardTitle} className="text-dark fw-bold mb-1">{userProfile.name}</h4>
-                    <p className="text-muted small">User ID: {auth.currentUser?.uid?.slice(0, 8)}...</p>
+                  <div
+                    style={styles.cardBody}
+                    className="text-center p-3 d-flex align-items-center justify-content-center"
+                  >
+                    <div>
+                      <h4
+                        style={styles.cardTitle}
+                        className="text-dark fw-bold mb-1"
+                      >
+                        {userData.profile.name}
+                      </h4>
+                      <p className="text-muted small">
+                        User ID: {auth.currentUser?.uid?.slice(0, 8)}...
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Points Progress Bars */}
             <div className="row mb-4">
-              <div className="col-12 col-md-6 mb-3 mb-md-0">
+              <div className="col-12 col-md-6 mb-3">
                 <div style={styles.dashboardCard} className="card shadow-sm">
                   <div style={styles.cardBody} className="p-3 text-center">
-                    <h6 style={styles.cardTitle} className="card-title text-primary mb-2">Points Progress</h6>
-                    <div style={styles.pointsProgress} onAnimationEnd={(e) => e.target.style.transform = "scale(1)"}>
+                    <h6 style={styles.cardTitle}>Points Progress</h6>
+                    <div style={styles.pointsProgress}>
                       <i
                         className="bi bi-star-fill"
                         style={{
                           ...styles.progressIcon,
-                          color: getProgressColor(pointsData.current, pointsData.total),
+                          color: getProgressColor(
+                            userData.points.current,
+                            userData.points.total
+                          ),
                         }}
                       />
-                      <p style={styles.progressText}>{pointsData.current} / {pointsData.total} pts</p>
+                      <p style={styles.progressText}>
+                        {userData.points.current} / {userData.points.total} pts
+                      </p>
+                      <button
+                        onClick={resetPointsBar}
+                        className="btn btn-warning w-100 mt-2"
+                      >
+                        Reset Points
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -828,246 +872,352 @@ const NormalMode = () => {
               <div className="col-12 col-md-6">
                 <div style={styles.dashboardCard} className="card shadow-sm">
                   <div style={styles.cardBody} className="p-3 text-center">
-                    <h6 style={styles.cardTitle} className="card-title text-primary mb-2">Monthly Points Progress</h6>
-                    <div style={styles.monthlyPointsProgress} onAnimationEnd={(e) => e.target.style.transform = "scale(1)"}>
+                    <h6 style={styles.cardTitle}>Monthly Points Progress</h6>
+                    <div style={styles.monthlyPointsProgress}>
                       <i
                         className="bi bi-trophy-fill"
                         style={{
                           ...styles.progressIcon,
-                          color: getProgressColor(MpointsData.current, MpointsData.total),
+                          color: getProgressColor(
+                            userData.Mpoints.current,
+                            userData.Mpoints.total
+                          ),
                         }}
                       />
-                      <p style={styles.progressText}>{MpointsData.current} / {MpointsData.total} pts</p>
+                      <p style={styles.progressText}>
+                        {userData.Mpoints.current} / {userData.Mpoints.total}{" "}
+                        pts
+                      </p>
+                      <button
+                        onClick={resetMonthlyPointsBar}
+                        className="btn btn-warning w-100 mt-2"
+                      >
+                        Reset Monthly Points
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-                            {/* Boost Section */}
-                       <div className="row mb-4">
-                         <div className="col-12">
-                           <div style={styles.dashboardCard} className="card shadow-sm">
-                             <div style={styles.boostSection} className="p-3">
-                              <h6 style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "15px" }}>
-                                    Apply a Boost
-                             </h6>
-                             <div className="d-flex align-items-center flex-wrap">
-                               <select
-                                 value={selectedTaskIndex}
-                                 onChange={(e) => setSelectedTaskIndex(e.target.value)}
-                                 style={styles.boostSelect}
-                                 className="me-2 mb-2"
-                                >
-                               <option value="">Select a Task</option>
-                               {tasks.map((task, index) => (
-                               <option key={index} value={index}>
-                               {task.name} {task.boost ? `(${task.boost})` : ""}
-                               </option>
-                               ))}
-                              </select>
-                              <select
-                                 value={selectedBoost}
-                                 onChange={(e) => setSelectedBoost(e.target.value)}
-                                 style={styles.boostSelect}
-                                 className="me-2 mb-2"
-                              >
-                              <option value="">Select a Boost</option>
-                                {Object.entries(BOOSTS).map(([key, boost]) => (
-                              <option key={key} value={key}>
-                                {key} - {boost.description}
-                              </option>
-                               ))}
-                             </select>
-                              <button
-                                 onClick={applyBoost}
-                                 style={styles.boostButton}
-                                 className="mb-2"
-                               >
-                                Apply Boost
-                             </button>
-                       </div>
-                     </div>
-                   </div>
-                </div>
-              </div>
-              
-
-            {/* Daily Tasks Section */}
-            <div className="row">
-              <div className="col-12 col-md-6 mb-3 mb-md-0">
-                <div style={styles.dashboardCard} className="card shadow-sm h-100">
-                  <div style={styles.cardBody} className="p-3">
-                    <h6 style={styles.cardTitle} className="card-title text-primary mb-2">Daily Tasks</h6>
-                    <div className="accordion" id="tasksAccordion">
-                      {Object.entries(groupedTasks).map(([category, categoryTasks]) => (
-                        <div className="accordion-item" key={category}>
-                          <h2 className="accordion-header" id={`heading-${category}`}>
-                            <button
-                              className={`accordion-button ${!openSections[category] ? "collapsed" : ""} text-dark`}
-                              onClick={() => toggleSection(category)}
-                              aria-expanded={openSections[category]}
-                              aria-controls={`collapse-${category}`}
-                            >
-                              {category} ({categoryTasks.length} tasks)
-                            </button>
-                          </h2>
-                          <div
-                            id={`collapse-${category}`}
-                            className={`accordion-collapse collapse ${openSections[category] ? "show" : ""}`}
-                          >
-                            <div className="accordion-body p-2">
-                              {categoryTasks.length > 0 ? (
-                                <ul className="list-group list-group-flush">
-                                  {categoryTasks.map((task, taskIndex) => {
-                                    const originalIndex = tasks.findIndex((t) => t.name === task.name);
-                                    return (
-                                      <li
-                                        key={taskIndex}
-                                        style={styles.listGroupItem}
-                                        className="d-flex justify-content-between align-items-center py-1 position-relative"
-                                        id={`task-${originalIndex}`}
-                                      >
-                                        <div>
-                                          <span style={{ color: "#dc3545" }}>{task.name}</span>
-                                          {task.boost && <span className="badge bg-primary ms-2">{task.boost}</span>}
-                                          {task.hasExceptionalOption && (
-                                            <select
-                                              value={task.selectedMode || "normal"}
-                                              onChange={(e) => handleModeChange(originalIndex, e.target.value)}
-                                              style={styles.formSelectSm}
-                                              className="ms-2"
-                                            >
-                                              <option value="normal">Normal</option>
-                                              <option value="exceptional">Exceptional</option>
-                                            </select>
-                                          )}
-                                          {task.hasTimesOption && (
-                                            <input
-                                              type="number"
-                                              min="1"
-                                              value={taskTimes[originalIndex] || 1}
-                                              onChange={(e) => handleTimesChange(originalIndex, e.target.value)}
-                                              style={styles.timesInput}
-                                              className="ms-2"
-                                            />
-                                          )}
-                                          <br />
-                                          <small className="text-muted">
-                                            ({task.points} Points) | Completed: {task.completionCount}/{task.numberLimit}
-                                          </small>
-                                        </div>
-                                        <div className="d-flex align-items-center">
-                                          <button
-                                            onClick={() => completeTask(originalIndex)}
-                                            className="btn btn-success btn-sm me-1"
-                                            disabled={task.completionCount >= task.numberLimit}
-                                          >
-                                            Complete
-                                          </button>
-                                          <button
-                                            onClick={() => resetTaskCompletionCount(originalIndex)}
-                                            className="btn btn-warning btn-sm me-1"
-                                          >
-                                            Reset
-                                          </button>
-                                          {task.boost && (
-                                            <button
-                                              onClick={() => removeBoost(originalIndex)}
-                                              className="btn btn-danger btn-sm"
-                                            >
-                                              Remove Boost
-                                            </button>
-                                          )}
-                                        </div>
-                                        {notifications
-                                          .filter((n) => n.position === `task-${originalIndex}`)
-                                          .map((notification) => (
-                                            <div
-                                              key={notification.id}
-                                              style={styles.taskNotification}
-                                              className="task-notification"
-                                            >
-                                              {notification.points ? `+${notification.points}pts` : ""}
-                                            </div>
-                                          ))}
-                                       </li>
-                                    );
-                                  })}
-                                </ul>
-                              ) : (
-                                <p className="text-muted small">No tasks in this category</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+            <div className="row mb-4">
+              <div className="col-12">
+                <div style={styles.dashboardCard} className="card shadow-sm">
+                  <div className="p-3">
+                    <h6 style={{ fontSize: "16px", fontWeight: "bold" }}>
+                      Apply a Boost
+                    </h6>
+                    <div className="d-flex align-items-center flex-wrap">
+                      <select
+                        value={selectedTaskIndex}
+                        onChange={(e) => setSelectedTaskIndex(e.target.value)}
+                        className="me-2 mb-2"
+                      >
+                        <option value="">Select a Task</option>
+                        {userData.tasks.map((task, index) => (
+                          <option key={index} value={index}>
+                            {task.name} {task.boost ? `(${task.boost})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={selectedBoost}
+                        onChange={(e) => setSelectedBoost(e.target.value)}
+                        className="me-2 mb-2"
+                      >
+                        <option value="">Select a Boost</option>
+                        {Object.entries(BOOSTS).map(([key, boost]) => (
+                          <option key={key} value={key}>
+                            {key} - {boost.description}
+                          </option>
+                        ))}
+                      </select>
+                      <button onClick={applyBoost} className="mb-2">
+                        Apply Boost
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
-
-              {/* Today's Completed Tasks Section */}
+            </div>
+            <div className="row mb-4 justify-content-center">
+              <button
+                onClick={startTheWeek}
+                style={styles.startWeekButton}
+                className="btn"
+              >
+                Start the Week
+              </button>
+              <button
+                onClick={startTheDay}
+                style={styles.startDayButton}
+                className="btn"
+              >
+                Start the Day
+              </button>
+              <button
+                onClick={refreshGlobalTasks}
+                style={{
+                  margin: "10px",
+                  padding: "10px 20px",
+                  backgroundColor: "#ffc107",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                }}
+                className="btn"
+              >
+                Refresh Global Tasks
+              </button>
+            </div>
+            <div className="row">
+              <div className="col-12 col-md-6 mb-3">
+                <div
+                  style={styles.dashboardCard}
+                  className="card shadow-sm h-100"
+                >
+                  <div style={styles.cardBody}>
+                    <h6 style={styles.cardTitle}>Daily Tasks</h6>
+                    <div className="accordion">
+                      {Object.entries(groupedTasks).map(
+                        ([category, categoryTasks]) => (
+                          <div className="accordion-item" key={category}>
+                            <h2 className="accordion-header">
+                              <button
+                                className={`accordion-button ${
+                                  !openSections[category] ? "collapsed" : ""
+                                } text-dark`}
+                                onClick={() => toggleSection(category)}
+                                aria-expanded={openSections[category]}
+                              >
+                                {category} ({categoryTasks.length} tasks)
+                              </button>
+                            </h2>
+                            <div
+                              className={`accordion-collapse collapse ${
+                                openSections[category] ? "show" : ""
+                              }`}
+                            >
+                              <div className="accordion-body p-2">
+                                {categoryTasks.length > 0 ? (
+                                  <ul className="list-group list-group-flush">
+                                    {categoryTasks.map((task, taskIndex) => {
+                                      const originalIndex =
+                                        userData.tasks.findIndex(
+                                          (t) => t.name === task.name
+                                        );
+                                      const isCompleteDisabled =
+                                        task.dailyCounter >= task.dailyLimit;
+                                      return (
+                                        <li
+                                          key={taskIndex}
+                                          style={styles.listGroupItem}
+                                          className="d-flex justify-content-between align-items-center py-1 position-relative"
+                                          id={`task-${originalIndex}`}
+                                        >
+                                          <div>
+                                            <span style={{ color: "#dc3545" }}>
+                                              {task.name}
+                                            </span>
+                                            {task.boost && (
+                                              <span className="badge bg-primary ms-2">
+                                                {task.boost}
+                                              </span>
+                                            )}
+                                            {task.hasExceptionalOption && (
+                                              <select
+                                                value={
+                                                  task.selectedMode || "normal"
+                                                }
+                                                onChange={(e) =>
+                                                  handleModeChange(
+                                                    originalIndex,
+                                                    e.target.value
+                                                  )
+                                                }
+                                                style={styles.formSelectSm}
+                                                className="ms-2"
+                                              >
+                                                <option value="normal">
+                                                  Normal
+                                                </option>
+                                                <option value="exceptional">
+                                                  Exceptional
+                                                </option>
+                                                <option value="penalty">
+                                                  Penalty
+                                                </option>
+                                              </select>
+                                            )}
+                                            {task.hasTimesOption && (
+                                              <input
+                                                type="number"
+                                                min="1"
+                                                value={
+                                                  taskTimes[originalIndex] || ""
+                                                }
+                                                onChange={(e) =>
+                                                  handleTimesChange(
+                                                    originalIndex,
+                                                    e.target.value
+                                                  )
+                                                }
+                                                style={styles.timesInput}
+                                                placeholder="Times"
+                                                className="ms-2"
+                                              />
+                                            )}
+                                            <br />
+                                            <small className="text-muted">
+                                              ({task.points} Points{" "}
+                                              {task.penaltyPoints ||
+                                              task.penalty
+                                                ? ` / -${
+                                                    task.penaltyPoints ||
+                                                    task.penalty
+                                                  } Penalty`
+                                                : ""}{" "}
+                                              ) | Total: {task.completionCount}/
+                                              {task.numberLimit} | Daily:{" "}
+                                              {task.dailyCounter}/
+                                              {task.dailyLimit}
+                                            </small>
+                                          </div>
+                                          <div className="d-flex align-items-center">
+                                            <button
+                                              onClick={() =>
+                                                completeTask(originalIndex)
+                                              }
+                                              className="btn btn-success btn-sm me-1"
+                                              disabled={isCompleteDisabled}
+                                            >
+                                              Complete
+                                            </button>
+                                            <button
+                                              onClick={() =>
+                                                resetTaskCompletionCount(
+                                                  originalIndex
+                                                )
+                                              }
+                                              className="btn btn-warning btn-sm me-1"
+                                            >
+                                              Reset
+                                            </button>
+                                            {task.boost && (
+                                              <button
+                                                onClick={() =>
+                                                  removeBoost(originalIndex)
+                                                }
+                                                className="btn btn-danger btn-sm"
+                                              >
+                                                Remove Boost
+                                              </button>
+                                            )}
+                                          </div>
+                                          {notifications
+                                            .filter(
+                                              (n) =>
+                                                n.position ===
+                                                `task-${originalIndex}`
+                                            )
+                                            .map((notification) => (
+                                              <div
+                                                key={notification.id}
+                                                style={styles.taskNotification}
+                                                className="task-notification"
+                                              >
+                                                {notification.points
+                                                  ? `${
+                                                      notification.points > 0
+                                                        ? "+"
+                                                        : ""
+                                                    }${notification.points}pts`
+                                                  : ""}
+                                              </div>
+                                            ))}
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                ) : (
+                                  <p className="text-muted small">
+                                    No tasks in this category
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div className="col-12 col-md-6">
-                <div style={styles.dashboardCard} className="card shadow-sm h-100">
-                  <div style={styles.cardBody} className="p-3">
-                    <h6 style={styles.cardTitle} className="card-title text-primary mb-2">Today's Completed Tasks</h6>
-                    <ul className="list-group list-group-flush">
-  {completedTasks.map((task, index) => (
-    <li
-      key={index}
-      style={styles.listGroupItem}
-      className="d-flex justify-content-between align-items-center py-1"
-    >
-      <span>
-        <span className="fw-bold text-dark">
-          {task.completionCount}x {/* Always use completionCount */}
-        </span>{" "}
-        {task.name}
-      </span>
-      <button onClick={() => undoTask(index)} className="btn btn-danger btn-sm">
-        Undo
-      </button>
-    </li>
-  ))}
-</ul>
-                    {completedTasks.length === 0 && (
-                      <p className="text-muted text-center small">No completed tasks today.</p>
+                <div
+                  style={styles.dashboardCard}
+                  className="card shadow-sm h-100"
+                >
+                  <div style={styles.cardBody}>
+                    <h6 style={styles.cardTitle}>Completed Tasks</h6>
+                    {userData.completedTasks.length > 0 ? (
+                      <ul className="list-group list-group-flush">
+                        {userData.completedTasks.map((task, index) =>
+                          task.isPenalty ? (
+                            <li
+                              key={index}
+                              style={styles.penaltyListGroupItem}
+                              className="d-flex justify-content-between align-items-center py-1"
+                            >
+                              <span>
+                                {task.name}{" "}
+                                <span className="fw-bold">Penalized</span>
+                              </span>
+                              <button
+                                onClick={() => undoTask(index)}
+                                className="btn btn-danger btn-sm"
+                              >
+                                Undo
+                              </button>
+                            </li>
+                          ) : (
+                            <li
+                              key={index}
+                              style={styles.listGroupItem}
+                              className="d-flex justify-content-between align-items-center py-1"
+                            >
+                              <span>
+                                <span className="fw-bold text-dark">
+                                  {task.completionCount}x
+                                </span>{" "}
+                                {task.name}{" "}
+                                <small className="text-muted ms-2">
+                                  (Daily: {task.dailyCounter}/{task.dailyLimit})
+                                </small>
+                              </span>
+                              <button
+                                onClick={() => undoTask(index)}
+                                className="btn btn-danger btn-sm"
+                              >
+                                Undo
+                              </button>
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    ) : (
+                      <p className="text-muted text-center small">
+                        No completed tasks this week.
+                      </p>
                     )}
                   </div>
                 </div>
               </div>
             </div>
-                      <div className="row mt-4">
-                        <div className="col-12 col-md-6 mb-3 mb-md-0">
-                              <button
-                                 onClick={resetPointsBar}
-                                 className="btn btn-warning w-100 really"
-                              >
-                                    Reset Points
-                             </button>
-                        </div>
-                        <div className="col-12 col-md-6">
-                               <button
-                                onClick={resetMonthlyPointsBar}
-                                 className="btn btn-warning w-100"
-                                >
-                                   Reset Monthly Points
-                                   </button>
-                        </div>
-                        <div className="col-12 mt-3">
-                          <button
-                              onClick={resetCompletedTasks}
-                              className="btn btn-danger w-100 completed"
-                          >
-                                   Reset All Completed Tasks
-                          </button> 
-                         </div> 
-                    </div>
-                  </>
-                )}
-          </div>
+          </>
+        )}
       </div>
-      );
-   };
+    </div>
+  );
+};
 
 export default NormalMode;
