@@ -1,0 +1,104 @@
+{
+  "Average": [
+    {
+      "name": "Book Journeyman",
+      "description": "Complete reading 5 pages of a book 20 times",
+      "taskId": "book_read",
+      "target": 20,
+      "points": 200,
+      "star": "bronze"
+    },
+    {
+      "name": "رتل القرآن",
+      "description": "Complete reading robo3 hizb 20 times",
+      "taskId": "quran_read",
+      "target": 20,
+      "points": 200,
+      "star": "bronze"
+    },
+    {
+      "name": "Fitness Initiate",
+      "description": "Complete exercising for 20 minutes 15 times",
+      "taskId": "sport_exercise",
+      "target": 15,
+      "points": 150,
+      "star": "bronze"
+    },
+    {
+      "name": "صاحب المسجد",
+      "description": "Complete praying at the mosque 30 times",
+      "taskId": "prayer_mosque",
+      "target": 30,
+      "points": 300,
+      "star": "bronze"
+    }
+  ],
+  "Advanced": [
+    {
+      "name": "Book Veteran",
+      "description": "Complete reading 5 pages of a book 75 times",
+      "taskId": "book_read",
+      "target": 75,
+      "points": 750,
+      "star": "silver"
+    },
+    {
+      "name": "قارئ الحكمة",
+      "description": "Complete reading robo3 hizb 75 times",
+      "taskId": "quran_read",
+      "target": 75,
+      "points": 750,
+      "star": "silver"
+    },
+    {
+      "name": "Fitness Elite",
+      "description": "Complete exercising for 20 minutes 45 times",
+      "taskId": "sport_exercise",
+      "target": 45,
+      "points": 450,
+      "star": "silver"
+    },
+    {
+      "name": "المقيم الصلاة",
+      "description": "Complete praying at the mosque 100 times",
+      "taskId": "prayer_mosque",
+      "target": 100,
+      "points": 1000,
+      "star": "silver"
+    }
+  ],
+  "Master": [
+    {
+      "name": "Book Grandmaster",
+      "description": "Complete reading 5 pages of a book 200 times",
+      "taskId": "book_read",
+      "target": 200,
+      "points": 2000,
+      "star": "gold"
+    },
+    {
+      "name": "قارئ البيان",
+      "description": "Complete reading robo3 hizb 200 times",
+      "taskId": "quran_read",
+      "target": 200,
+      "points": 2000,
+      "star": "gold"
+    },
+    {
+      "name": "Fitness Legend",
+      "description": "Complete exercising for 20 minutes 100 times",
+      "taskId": "sport_exercise",
+      "target": 100,
+      "points": 1000,
+      "star": "gold"
+    },
+    {
+      "name": "مجاهد المسجد",
+      "description": "Complete praying at the mosque 250 times",
+      "taskId": "prayer_mosque",
+      "target": 250,
+      "points": 2500,
+      "star": "gold"
+    }
+  ]
+}

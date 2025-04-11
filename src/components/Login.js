@@ -1,27 +1,116 @@
 import React, { useState, useEffect } from "react";
-import { auth } from "../firebase";
+import { auth, database } from "../firebase";
 import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
   updatePassword,
+  setPersistence,
+  browserLocalPersistence, // Add this import
 } from "firebase/auth";
+import { ref, get } from "firebase/database";
 import { useNavigate, Link } from "react-router-dom";
-import "./styles/Login.css"; // Import the CSS file
-import Swal from "sweetalert2"; // Import SweetAlert2 for confirmation dialog
+import "./styles/Login.css";
+import Swal from "sweetalert2";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(null); // Track authenticated user
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate("/dashboard"); // Redirect to the dashboard after login
+      // Clear previous user data
+      const oldUserId = localStorage.getItem("userId");
+      if (oldUserId) {
+        localStorage.removeItem(`userData_${oldUserId}`);
+      }
+
+      await setPersistence(auth, browserLocalPersistence);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const userId = userCredential.user.uid;
+
+      await cacheAndVerifyData(userId);
+
+      // Set localStorage flag and user ID
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("userId", userCredential.user.uid);
+
+      navigate("/dashboard");
     } catch (error) {
-      alert(error.message);
+      Swal.fire({
+        icon: "error",
+        title: "Login Failed",
+        text: error.message,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const cacheAndVerifyData = async () => {
+    try {
+      // Get references to Firebase data
+      const globalTasksRef = ref(database, "globalTasks");
+      const achievementsRef = ref(database, "achievements");
+
+      // Get current cached data
+      const cachedTasks = localStorage.getItem("globalTasks");
+      const cachedAchievements = localStorage.getItem("achievements");
+
+      // Fetch fresh data from Firebase
+      const [tasksSnapshot, achievementsSnapshot] = await Promise.all([
+        get(globalTasksRef),
+        get(achievementsRef),
+      ]);
+
+      const firebaseTasks = tasksSnapshot.val() || {};
+      const firebaseAchievements = achievementsSnapshot.val() || {};
+
+      // Cache achievements if not present
+      if (!cachedAchievements) {
+        localStorage.setItem(
+          "achievements",
+          JSON.stringify(firebaseAchievements)
+        );
+      }
+
+      // Cache tasks if not present
+      if (!cachedTasks) {
+        localStorage.setItem("globalTasks", JSON.stringify(firebaseTasks));
+      }
+
+      // Verify and update cached achievements if they don't match Firebase
+      const currentCachedAchievements = JSON.parse(cachedAchievements || "{}");
+      if (
+        JSON.stringify(currentCachedAchievements) !==
+        JSON.stringify(firebaseAchievements)
+      ) {
+        localStorage.setItem(
+          "achievements",
+          JSON.stringify(firebaseAchievements)
+        );
+        console.log("Achievements updated from Firebase");
+      }
+
+      // Verify and update cached global tasks if they don't match Firebase
+      const currentCachedTasks = JSON.parse(cachedTasks || "{}");
+      if (
+        JSON.stringify(currentCachedTasks) !== JSON.stringify(firebaseTasks)
+      ) {
+        localStorage.setItem("globalTasks", JSON.stringify(firebaseTasks));
+        console.log("Global tasks updated from Firebase");
+      }
+    } catch (error) {
+      console.error("Error caching and verifying data:", error);
+      // Fail silently - this shouldn't block login
     }
   };
 
@@ -36,7 +125,6 @@ const Login = () => {
       return;
     }
 
-    // Prompt for email confirmation and new password
     const { value: formValues } = await Swal.fire({
       title: "Reset Password",
       html:
@@ -85,13 +173,16 @@ const Login = () => {
     }
   };
 
-  // Listen for authentication state to get the current user
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
+      const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+      if (user && isLoggedIn) {
+        navigate("/dashboard");
+      }
     });
     return () => unsubscribe();
-  }, []);
+  }, [navigate]);
 
   return (
     <div className="login-container">
@@ -101,43 +192,43 @@ const Login = () => {
       </video>
       <div className="login-card">
         <h2>Login</h2>
-        <form onSubmit={handleLogin}>
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+        {isLoading ? (
+          <div className="login-loading">
+            <div className="spinner"></div>
+            <p>Logging in and loading data...</p>
           </div>
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <button type="submit" className="login-button">
-            Login
-          </button>
-        </form>
+        ) : (
+          <form onSubmit={handleLogin}>
+            <div className="form-group">
+              <label htmlFor="email">Email</label>
+              <input
+                type="email"
+                id="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+              <input
+                type="password"
+                id="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <button type="submit" className="login-button" disabled={isLoading}>
+              {isLoading ? "Logging in..." : "Login"}
+            </button>
+          </form>
+        )}
         <p className="signup-link">
           Don't have an account? <Link to="/signup">Sign up here</Link>
         </p>
-        {/* <button
-          onClick={resetPassword}
-          className="reset-password-button"
-          // Disable if not logged in
-        >
-          Reset Password
-        </button> */}
       </div>
     </div>
   );

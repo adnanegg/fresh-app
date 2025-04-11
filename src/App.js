@@ -11,6 +11,8 @@ import Dashboard from "./components/Dashboard";
 import Profile from "./components/Profile";
 import Login from "./components/Login";
 import Statistics from "./components/Statistics";
+import GamePage from "./components/GamePage";
+import AdminPage from "./components/AdminPage";
 import Signup from "./components/Signup";
 import NormalModeContainer from "./components/NormalModeContainer";
 
@@ -71,6 +73,22 @@ function App() {
           element={
             <PrivateRoute>
               <NormalModeContainer />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/gamepage"
+          element={
+            <PrivateRoute>
+              <GamePage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/adminpage"
+          element={
+            <PrivateRoute>
+              <AdminPage />
             </PrivateRoute>
           }
         />

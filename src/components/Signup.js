@@ -16,6 +16,12 @@ const Signup = () => {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    const oldUserId = localStorage.getItem("userId");
+    if (oldUserId) {
+      localStorage.removeItem(`userData_${oldUserId}`);
+    }
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userId");
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -60,6 +66,7 @@ const Signup = () => {
         `userData_${userId}`,
         JSON.stringify(initialUserData)
       );
+      await new Promise((resolve) => setTimeout(resolve, 500));
       navigate("/dashboard");
     } catch (error) {
       alert(error.message);

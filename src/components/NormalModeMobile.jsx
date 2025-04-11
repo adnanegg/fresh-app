@@ -1,579 +1,49 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState } from "react";
 import { auth, database } from "../firebase";
 import { signOut } from "firebase/auth";
 import { useNavigate, Link } from "react-router-dom";
-import { ref, get, update } from "firebase/database";
+import { useNormalModeLogic } from "./NormalModeLogic";
 import Swal from "sweetalert2";
 import "./styles/style.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 
-const BONUS_POINTS = 10;
-const BOOSTS = {
-  DoubleEverything: {
-    multiplier: 2,
-    type: "all",
-    description: "Doubles Points for this task",
-  },
-  "+30Percent": {
-    percentage: 0.3,
-    type: "all",
-    description: "Increases Points by 30% for this task",
-  },
-  TheSavior: {
-    type: "savior",
-    description: "Enables multiple completions per day",
-  },
-  DoubleOrDie: {
-    multiplier: 2,
-    type: "doubleOrDie",
-    description: "Doubles points if completed, -10 if missed by reset",
-  },
-  PerfectBonus: {
-    bonus: 50,
-    type: "perfectBonus",
-    description: "Sets perfect completion bonus to 50 points",
-  },
-};
-
-const NormalModeMobile = ({ globalTasks }) => {
+const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
   const navigate = useNavigate();
-  const userId = auth.currentUser?.uid;
-  const [userData, setUserData] = useState(() => {
-    const storedData = localStorage.getItem(`userData_${userId}`);
-    const parsedData = storedData ? JSON.parse(storedData) : {};
-    return {
-      profile: parsedData.profile || { name: "User" },
-      points: parsedData.points || { current: 0, total: 4500 },
-      Mpoints: parsedData.Mpoints || { current: 0, total: 12000 },
-      tasks: Array.isArray(parsedData.tasks) ? parsedData.tasks : [], // Ensure tasks is always an array
-      completedTasks: Array.isArray(parsedData.completedTasks)
-        ? parsedData.completedTasks
-        : [],
-      lastUpdated: parsedData.lastUpdated || Date.now(),
-    };
-  });
-  const [notifications, setNotifications] = useState([]);
-  const [openSections, setOpenSections] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedTaskIndex, setSelectedTaskIndex] = useState("");
-  const [selectedBoost, setSelectedBoost] = useState("");
-  const [taskTimes, setTaskTimes] = useState({});
-  const [isCompletedTasksOpen, setIsCompletedTasksOpen] = useState(false);
-  const [isFetchingCompletedTasks, setIsFetchingCompletedTasks] =
-    useState(false);
+  const {
+    userData,
+    notifications,
+    openSections,
+    isLoading,
+    selectedTaskIndex,
+    setSelectedTaskIndex,
+    selectedBoost,
+    setSelectedBoost,
+    taskTimes,
+    groupedTasks,
+    toggleSection,
+    handleModeChange,
+    applyBoost,
+    removeBoost,
+    handleTimesChange,
+    completeTask,
+    undoTask,
+    resetTaskCompletionCount,
+    resetCompletedTasks,
+    resetAllTaskCompletionCount,
+    resetPointsBar,
+    resetMonthlyPointsBar,
+    handleLogout,
+    startTheWeek,
+    startTheDay,
+    getProgressColor,
+    isAchievementsOpen,
+    toggleAchievements,
+    refreshGlobalTasks: refreshGlobalTasksFromLogic,
+  } = useNormalModeLogic(globalTasks, refreshGlobalTasks);
 
-  const groupedTasks = useMemo(() => {
-    if (!Array.isArray(userData.tasks)) return {};
-    return userData.tasks.reduce((acc, task) => {
-      if (!acc[task.category]) acc[task.category] = [];
-      acc[task.category].push(task);
-      return acc;
-    }, {});
-  }, [userData.tasks]);
-
-  const syncWithFirebase = useCallback(async () => {
-    if (!userId) return;
-    setIsLoading(true);
-    try {
-      const userRef = ref(database, `users/${userId}`);
-      const snapshot = await get(userRef);
-      const firebaseData = snapshot.val() || {};
-      const localLastUpdated = userData.lastUpdated || 0;
-      const firebaseLastUpdated = firebaseData.lastUpdated || 0;
-
-      if (firebaseLastUpdated > localLastUpdated) {
-        localStorage.setItem(
-          `userData_${userId}`,
-          JSON.stringify(firebaseData)
-        );
-        setUserData(firebaseData);
-      } else {
-        await update(userRef, userData);
-      }
-    } catch (error) {
-      console.error("Sync error:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Sync Failed",
-        text: "Could not sync with server.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userId, userData]);
-
-  useEffect(() => {
-    if (!userId) {
-      navigate("/login");
-      return;
-    }
-    // Merge globalTasks with userData.tasks from localStorage
-    const cachedGlobalTasks =
-      JSON.parse(localStorage.getItem("globalTasks")) || globalTasks;
-    const initialTasks = Object.keys(cachedGlobalTasks).map((taskId) => {
-      const userTask = userData.tasks.find((t) => t.taskId === taskId) || {};
-      return {
-        ...cachedGlobalTasks[taskId],
-        taskId,
-        completionCount: userTask.completionCount || 0,
-        dailyCounter: userTask.dailyCounter || 0,
-        boost: userTask.boost || null,
-        hasTimesOption:
-          userTask.hasTimesOption ||
-          cachedGlobalTasks[taskId].hasTimesOption ||
-          false,
-        selectedMode: userTask.selectedMode || "normal",
-      };
-    });
-
-    setUserData((prev) => ({ ...prev, tasks: initialTasks }));
-    setOpenSections(
-      Object.keys(groupedTasks).reduce(
-        (acc, category) => ({ ...acc, [category]: category === "Task" }),
-        {}
-      )
-    );
-
-    const intervalId = setInterval(syncWithFirebase, 15 * 60 * 1000); // 15 minutes
-    return () => clearInterval(intervalId);
-  }, [navigate, userId, globalTasks, syncWithFirebase]);
-
-  const updateLocalData = (newData) => {
-    const updatedData = { ...userData, ...newData, lastUpdated: Date.now() };
-    localStorage.setItem(`userData_${userId}`, JSON.stringify(updatedData));
-    setUserData(updatedData);
-  };
-
-  const toggleSection = useCallback(
-    (category) =>
-      setOpenSections((prev) => ({ ...prev, [category]: !prev[category] })),
-    []
-  );
-  const handleModeChange = useCallback(
-    (index, newMode) => {
-      const updatedTasks = userData.tasks.map((t, i) =>
-        i === index ? { ...t, selectedMode: newMode } : t
-      );
-      updateLocalData({ tasks: updatedTasks });
-    },
-    [userData.tasks]
-  );
-
-  const applyBoost = useCallback(async () => {
-    if (selectedTaskIndex === "" || !selectedBoost) {
-      Swal.fire({
-        icon: "warning",
-        title: "Selection Required",
-        text: "Please select a task and a boost.",
-      });
-      return;
-    }
-    const task = userData.tasks[selectedTaskIndex];
-    if (task.boost) {
-      Swal.fire({
-        icon: "warning",
-        title: "Boost Already Applied",
-        text: `A boost (${task.boost}) is already applied to "${task.name}".`,
-      });
-      return;
-    }
-    const result = await Swal.fire({
-      title: `Apply ${selectedBoost}?`,
-      text: BOOSTS[selectedBoost].description,
-      icon: "question",
-      showCancelButton: true,
-    });
-    if (result.isConfirmed) {
-      const updatedTasks = userData.tasks.map((t, i) =>
-        i === Number(selectedTaskIndex)
-          ? {
-              ...t,
-              boost: selectedBoost,
-              hasTimesOption:
-                selectedBoost === "TheSavior" ? true : t.hasTimesOption,
-            }
-          : t
-      );
-      updateLocalData({ tasks: updatedTasks });
-      Swal.fire({
-        icon: "success",
-        title: "Boost Applied!",
-        text: `Boost ${selectedBoost} applied to ${task.name}.`,
-      });
-    }
-    setSelectedTaskIndex("");
-    setSelectedBoost("");
-  }, [userData.tasks, selectedTaskIndex, selectedBoost]);
-
-  const removeBoost = useCallback(
-    async (index) => {
-      const task = userData.tasks[index];
-      if (!task.boost) {
-        Swal.fire({
-          icon: "warning",
-          title: "No Boost",
-          text: `No boost is applied to "${task.name}".`,
-        });
-        return;
-      }
-      const result = await Swal.fire({
-        title: "Remove Boost?",
-        text: `Remove ${task.boost} from "${task.name}"?`,
-        icon: "question",
-        showCancelButton: true,
-      });
-      if (result.isConfirmed) {
-        const updatedTasks = userData.tasks.map((t, i) =>
-          i === index
-            ? {
-                ...t,
-                boost: null,
-                hasTimesOption:
-                  task.boost === "TheSavior" ? false : t.hasTimesOption,
-              }
-            : t
-        );
-        updateLocalData({ tasks: updatedTasks });
-        Swal.fire({
-          icon: "success",
-          title: "Boost Removed!",
-          text: `Boost removed from ${task.name}.`,
-        });
-      }
-    },
-    [userData.tasks]
-  );
-
-  const handleTimesChange = useCallback((index, value) => {
-    setTaskTimes((prev) => ({
-      ...prev,
-      [index]: value === "" ? "" : Math.max(1, parseInt(value) || 1),
-    }));
-  }, []);
-
-  const completeTask = useCallback(
-    (index) => {
-      const task = userData.tasks[index];
-      if (!task || typeof task.points !== "number") return;
-
-      const times = task.hasTimesOption ? taskTimes[index] || 1 : 1;
-      if (task.dailyCounter + times > task.dailyLimit) {
-        Swal.fire({
-          icon: "warning",
-          title: "Daily Limit Reached",
-          text: `Daily limit of ${task.dailyLimit} reached for "${task.name}".`,
-        });
-        return;
-      }
-      if (task.completionCount >= task.numberLimit) {
-        Swal.fire({
-          icon: "warning",
-          title: "Task Limit Reached",
-          text: `"${task.name}" completed max times (${task.numberLimit}).`,
-        });
-        return;
-      }
-      const newCompletionCount = task.completionCount + times;
-      if (newCompletionCount > task.numberLimit) {
-        Swal.fire({
-          icon: "warning",
-          title: "Exceeds Limit",
-          text: `Completing ${times} times exceeds limit of ${task.numberLimit}.`,
-        });
-        return;
-      }
-
-      let effectivePoints = task.points;
-      let bonusPoints = 0;
-      if (task.hasExceptionalOption) {
-        if (task.selectedMode === "exceptional")
-          effectivePoints = task.points / 2;
-        else if (task.selectedMode === "penalty")
-          effectivePoints = -(task.penaltyPoints || task.penalty || 10);
-      }
-      if (
-        task.boost &&
-        (!task.hasExceptionalOption || task.selectedMode !== "penalty")
-      ) {
-        const boost = BOOSTS[task.boost];
-        if (boost.multiplier) effectivePoints *= boost.multiplier;
-        else if (boost.percentage) effectivePoints *= 1 + boost.percentage;
-      }
-      const totalPoints = effectivePoints * times;
-      if (
-        newCompletionCount === task.numberLimit &&
-        (!task.hasExceptionalOption || task.selectedMode !== "penalty")
-      ) {
-        bonusPoints =
-          task.boost === "PerfectBonus"
-            ? BOOSTS["PerfectBonus"].bonus
-            : BONUS_POINTS;
-      }
-
-      const updatedTask = {
-        ...task,
-        completionCount: newCompletionCount,
-        dailyCounter: task.dailyCounter + times,
-      };
-      const newTasks = userData.tasks.map((t, i) =>
-        i === index ? updatedTask : t
-      );
-      const newCompletedTasks = [...userData.completedTasks];
-      const existingIndex = newCompletedTasks.findIndex(
-        (t) => t.name === task.name
-      );
-
-      if (existingIndex === -1) {
-        newCompletedTasks.push({
-          name: task.name,
-          basePoints: task.points,
-          points: totalPoints,
-          completionCount: times,
-          bonusPoints,
-          boost: task.boost || null,
-          numberLimit: task.numberLimit,
-          hasTimesOption: task.hasTimesOption,
-          hasExceptionalOption: task.hasExceptionalOption || false,
-          category: task.category || "Task",
-          frequencyUnit: task.frequencyUnit || "days",
-          weeklyFrequency: task.weeklyFrequency || 1,
-          requiredCompletions: task.requiredCompletions || 1,
-          dailyLimit: task.dailyLimit,
-          dailyCounter: times,
-          penaltyPoints: task.penaltyPoints || task.penalty || 0,
-          ...(task.hasExceptionalOption
-            ? {
-                selectedMode: task.selectedMode || "normal",
-                isPenalty: task.selectedMode === "penalty",
-              }
-            : {}),
-          ...(task.hasTimesOption ? { times } : {}),
-        });
-      } else {
-        const existingTask = newCompletedTasks[existingIndex];
-        newCompletedTasks[existingIndex] = {
-          ...existingTask,
-          points: existingTask.points + totalPoints,
-          completionCount: existingTask.completionCount + times,
-          bonusPoints:
-            newCompletionCount === task.numberLimit && !existingTask.bonusPoints
-              ? bonusPoints
-              : existingTask.bonusPoints,
-          dailyCounter: existingTask.dailyCounter + times,
-        };
-      }
-
-      const newPointsData = {
-        ...userData.points,
-        current: Math.max(
-          userData.points.current + totalPoints + bonusPoints,
-          0
-        ),
-      };
-      const newMpointsData = {
-        ...userData.Mpoints,
-        current: Math.max(
-          userData.Mpoints.current + totalPoints + bonusPoints,
-          0
-        ),
-      };
-      updateLocalData({
-        tasks: newTasks,
-        completedTasks: newCompletedTasks,
-        points: newPointsData,
-        Mpoints: newMpointsData,
-      });
-
-      setTaskTimes((prev) => ({ ...prev, [index]: "" }));
-      setNotifications((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          position: `task-${index}`,
-          points: totalPoints + bonusPoints,
-        },
-      ]);
-      setTimeout(
-        () =>
-          setNotifications((prev) => prev.filter((n) => n.id !== Date.now())),
-        3000
-      );
-    },
-    [userData, taskTimes]
-  );
-
-  const undoTask = useCallback(
-    (index) => {
-      const task = userData.completedTasks[index];
-      const taskIndex = userData.tasks.findIndex((t) => t.name === task.name);
-      const originalTask = taskIndex !== -1 ? userData.tasks[taskIndex] : null;
-
-      const newCompletionCount = Math.max(task.completionCount - 1, 0);
-      const newDailyCounter = Math.max(task.dailyCounter - 1, 0);
-      let pointsToAdjust = task.points / task.completionCount;
-      if (task.hasExceptionalOption) {
-        if (task.selectedMode === "penalty")
-          pointsToAdjust = -(task.penaltyPoints || task.penalty || 10);
-        else if (task.selectedMode === "exceptional")
-          pointsToAdjust = task.basePoints / 2;
-      }
-      if (task.bonusPoints && task.completionCount === task.numberLimit)
-        pointsToAdjust += task.bonusPoints;
-
-      const newCompletedTasks = [...userData.completedTasks];
-      if (newCompletionCount > 0) {
-        newCompletedTasks[index] = {
-          ...task,
-          completionCount: newCompletionCount,
-          points: task.points - pointsToAdjust,
-          dailyCounter: newDailyCounter,
-          bonusPoints:
-            newCompletionCount === task.numberLimit - 1 ? 0 : task.bonusPoints,
-          ...(task.hasTimesOption
-            ? { times: Math.max((task.times || task.completionCount) - 1, 0) }
-            : {}),
-        };
-      } else {
-        newCompletedTasks.splice(index, 1);
-      }
-
-      const newTasks = originalTask
-        ? userData.tasks.map((t, i) =>
-            i === taskIndex
-              ? {
-                  ...t,
-                  completionCount: Math.max(t.completionCount - 1, 0),
-                  dailyCounter: newDailyCounter,
-                }
-              : t
-          )
-        : userData.tasks;
-      const newPointsData = {
-        ...userData.points,
-        current: Math.max(userData.points.current - pointsToAdjust, 0),
-      };
-      const newMpointsData = {
-        ...userData.Mpoints,
-        current: Math.max(userData.Mpoints.current - pointsToAdjust, 0),
-      };
-      updateLocalData({
-        tasks: newTasks,
-        completedTasks: newCompletedTasks,
-        points: newPointsData,
-        Mpoints: newMpointsData,
-      });
-    },
-    [userData]
-  );
-
-  const resetTaskCompletionCount = useCallback(
-    (index) => {
-      const task = userData.tasks[index];
-      const updatedTasks = userData.tasks.map((t, i) =>
-        i === index ? { ...t, completionCount: 0, dailyCounter: 0 } : t
-      );
-      updateLocalData({ tasks: updatedTasks });
-      Swal.fire({
-        icon: "success",
-        title: "Task Reset",
-        text: `"${task.name}" has been reset.`,
-      });
-    },
-    [userData.tasks]
-  );
-
-  const resetCompletedTasks = useCallback(() => {
-    const taskMap = new Map();
-    userData.completedTasks.forEach((completedTask) =>
-      taskMap.set(completedTask.name, { ...completedTask, dailyCounter: 0 })
-    );
-    const resetTasks = userData.tasks.map((task) =>
-      taskMap.get(task.name) ? { ...task, dailyCounter: 0 } : task
-    );
-    updateLocalData({ tasks: resetTasks, completedTasks: [] });
-    Swal.fire({
-      icon: "success",
-      title: "Tasks Reset!",
-      text: "All tasks returned to Daily Tasks.",
-    });
-  }, [userData]);
-
-  const resetAllTaskCompletionCount = useCallback(() => {
-    const resetTasks = userData.tasks.map((task) => ({
-      ...task,
-      completionCount: 0,
-      dailyCounter: 0,
-    }));
-    updateLocalData({ tasks: resetTasks });
-    Swal.fire({
-      icon: "success",
-      title: "All Tasks Reset!",
-      text: "All task completions reset to 0.",
-    });
-  }, [userData.tasks]);
-
-  const resetPointsBar = useCallback(() => {
-    const newPointsData = { current: 0, total: 4500 };
-    updateLocalData({ points: newPointsData });
-    Swal.fire({
-      icon: "success",
-      title: "Points Bar Reset!",
-      text: "Points reset to 0.",
-    });
-  }, []);
-
-  const resetMonthlyPointsBar = useCallback(() => {
-    const newMpointsData = { current: 0, total: 12000 };
-    updateLocalData({ Mpoints: newMpointsData });
-    Swal.fire({
-      icon: "success",
-      title: "Monthly Points Reset!",
-      text: "Monthly points reset to 0.",
-    });
-  }, []);
-
-  const handleLogout = useCallback(async () => {
-    await syncWithFirebase();
-    await signOut(auth);
-    localStorage.removeItem(`userData_${userId}`);
-    navigate("/login");
-  }, [navigate, syncWithFirebase, userId]);
-
-  const startTheWeek = useCallback(() => {
-    const resetTasks = userData.tasks.map((task) => ({
-      ...task,
-      completionCount: 0,
-      dailyCounter: 0,
-    }));
-    const newPointsData = { current: 0, total: 4500 };
-    updateLocalData({
-      tasks: resetTasks,
-      completedTasks: [],
-      points: newPointsData,
-    });
-    Swal.fire({
-      icon: "success",
-      title: "Week Started!",
-      text: "All tasks, completions, and points reset.",
-    });
-  }, [userData]);
-
-  const startTheDay = useCallback(() => {
-    const taskMap = new Map();
-    userData.completedTasks.forEach((completedTask) =>
-      taskMap.set(completedTask.name, { ...completedTask, dailyCounter: 0 })
-    );
-    const resetTasks = userData.tasks.map((task) =>
-      taskMap.get(task.name) ? { ...task, dailyCounter: 0 } : task
-    );
-    updateLocalData({ tasks: resetTasks, completedTasks: [] });
-    Swal.fire({
-      icon: "success",
-      title: "Day Started!",
-      text: "Daily tasks reset.",
-    });
-  }, [userData]);
+  const [openAchievementSections, setOpenAchievementSections] = useState({});
+  const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = useState(false); // New state for toggling weekly tasks
 
   const styles = {
     containerFluid: { padding: 0, minHeight: "100vh" },
@@ -639,12 +109,6 @@ const NormalModeMobile = ({ globalTasks }) => {
       marginBottom: "5px",
       animation: "pulse 2s infinite ease-in-out",
     },
-    profileAvatar: { display: "inline-block", paddingLeft: "5px" },
-    sidebarProfileIcon: {
-      width: "30px",
-      height: "30px",
-      border: "1px solid #007bff",
-    },
     timesInput: {
       width: "60px",
       padding: "4px",
@@ -687,6 +151,35 @@ const NormalModeMobile = ({ globalTasks }) => {
       alignItems: "center",
       justifyContent: "center",
     },
+    achievementsModal: {
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      width: "90%",
+      maxHeight: "80vh",
+      background: "white",
+      padding: "15px",
+      borderRadius: "8px",
+      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+      zIndex: 2000,
+      overflowY: "auto",
+    },
+    overlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      background: "rgba(0, 0, 0, 0.5)",
+      zIndex: 1999,
+    },
+    achievementsContainer: {
+      display: "flex",
+      flexDirection: "column",
+      width: "100%",
+    },
+    achievementSection: { margin: "5px 0" },
   };
 
   const stylesString = `
@@ -707,17 +200,14 @@ const NormalModeMobile = ({ globalTasks }) => {
     }
   `;
 
-  const getProgressColor = (current, total) => {
-    const percentage = (current / total) * 100;
-    if (percentage >= 75) return "#28a745";
-    if (percentage >= 25) return "#ffc107";
-    return "#dc3545";
+  const toggleAchievementSection = (category) => {
+    setOpenAchievementSections((prev) => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
   };
 
-  const pointsData = userData.points;
-  const MpointsData = userData.Mpoints;
-  const tasks = userData.tasks;
-  const completedTasks = userData.completedTasks;
+  const sortedCategories = ["Average", "Advanced", "Master"];
 
   return (
     <div style={styles.containerFluid}>
@@ -726,19 +216,25 @@ const NormalModeMobile = ({ globalTasks }) => {
         <div className="nav-brand">
           <img src="/trackerLogo.png" alt="Logo" style={{ width: "30px" }} />
           <span className="nav-title" style={{ fontSize: "14px" }}>
-            Normal Mode
+            Program
           </span>
         </div>
         <div className="nav-links" style={{ fontSize: "12px" }}>
           <Link to="/dashboard" className="nav-link">
             <i className="bi bi-house-fill"></i>
           </Link>
-          <Link to="/normal-mode-mobile" className="nav-link">
+          <Link to="/normal-mode" className="nav-link">
             <i className="bi bi-star-fill"></i>
+          </Link>
+          <Link to="/gamepage" className="nav-link">
+            <i className="bi bi-dice-6-fill"></i> Game
           </Link>
           <Link to="/statistics" className="nav-link">
             <i className="bi bi-bar-chart-fill"></i>
           </Link>
+          <button onClick={toggleAchievements} className="nav-link">
+            <i className="bi bi-trophy-fill"></i>
+          </button>
           <button
             onClick={handleLogout}
             className="nav-logout"
@@ -777,6 +273,41 @@ const NormalModeMobile = ({ globalTasks }) => {
                     <p className="text-muted" style={{ fontSize: "10px" }}>
                       User ID: {auth.currentUser?.uid?.slice(0, 8)}...
                     </p>
+                    <div className="mt-1">
+                      <span className="me-2">
+                        <i
+                          className="bi bi-star-fill"
+                          style={{ color: "#cd7f32", fontSize: "14px" }}
+                        ></i>{" "}
+                        {
+                          Object.values(userData.achievements).filter(
+                            (a) => a.star === "bronze"
+                          ).length
+                        }
+                      </span>
+                      <span className="me-2">
+                        <i
+                          className="bi bi-star-fill"
+                          style={{ color: "#c0c0c0", fontSize: "14px" }}
+                        ></i>{" "}
+                        {
+                          Object.values(userData.achievements).filter(
+                            (a) => a.star === "silver"
+                          ).length
+                        }
+                      </span>
+                      <span>
+                        <i
+                          className="bi bi-star-fill"
+                          style={{ color: "#ffd700", fontSize: "14px" }}
+                        ></i>{" "}
+                        {
+                          Object.values(userData.achievements).filter(
+                            (a) => a.star === "gold"
+                          ).length
+                        }
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -792,13 +323,13 @@ const NormalModeMobile = ({ globalTasks }) => {
                         style={{
                           ...styles.progressIcon,
                           color: getProgressColor(
-                            pointsData.current,
-                            pointsData.total
+                            userData.points.current,
+                            userData.points.total
                           ),
                         }}
                       />
                       <p style={styles.progressText}>
-                        {pointsData.current}/{pointsData.total}
+                        {userData.points.current}/{userData.points.total}
                       </p>
                       <button
                         onClick={resetPointsBar}
@@ -821,13 +352,13 @@ const NormalModeMobile = ({ globalTasks }) => {
                         style={{
                           ...styles.progressIcon,
                           color: getProgressColor(
-                            MpointsData.current,
-                            MpointsData.total
+                            userData.Mpoints.current,
+                            userData.Mpoints.total
                           ),
                         }}
                       />
                       <p style={styles.progressText}>
-                        {MpointsData.current}/{MpointsData.total}
+                        {userData.Mpoints.current}/{userData.Mpoints.total}
                       </p>
                       <button
                         onClick={resetMonthlyPointsBar}
@@ -856,7 +387,7 @@ const NormalModeMobile = ({ globalTasks }) => {
                         style={{ fontSize: "12px" }}
                       >
                         <option value="">Select Task</option>
-                        {tasks.map((task, index) => (
+                        {userData.tasks.map((task, index) => (
                           <option key={index} value={index}>
                             {task.name} {task.boost ? `(${task.boost})` : ""}
                           </option>
@@ -869,7 +400,15 @@ const NormalModeMobile = ({ globalTasks }) => {
                         style={{ fontSize: "12px" }}
                       >
                         <option value="">Select Boost</option>
-                        {Object.entries(BOOSTS).map(([key, boost]) => (
+                        {Object.entries({
+                          DoubleEverything: { description: "Doubles Points" },
+                          "+30Percent": {
+                            description: "Increases Points by 30%",
+                          },
+                          TheSavior: { description: "Multiple completions" },
+                          DoubleOrDie: { description: "Double or -10" },
+                          PerfectBonus: { description: "50 point bonus" },
+                        }).map(([key, boost]) => (
                           <option key={key} value={key}>
                             {key} - {boost.description}
                           </option>
@@ -902,100 +441,23 @@ const NormalModeMobile = ({ globalTasks }) => {
               >
                 Start Day
               </button>
+              <button
+                onClick={refreshGlobalTasksFromLogic}
+                style={{
+                  margin: "5px",
+                  padding: "8px 16px",
+                  backgroundColor: "#ffc107",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                }}
+                className="btn"
+              >
+                Refresh Tasks
+              </button>
             </div>
             <div className="row mobile-column">
-              <div className="col-12 mb-3">
-                <div style={styles.dashboardCard} className="card shadow-sm">
-                  <div style={styles.cardBody}>
-                    <h6 style={styles.cardTitle}>Completed Tasks</h6>
-                    <button
-                      onClick={() =>
-                        setIsCompletedTasksOpen(!isCompletedTasksOpen)
-                      }
-                      className="btn btn-primary btn-sm w-100 mb-2"
-                      style={{ fontSize: "12px" }}
-                    >
-                      {isCompletedTasksOpen
-                        ? "Hide Completed"
-                        : "Show Completed"}
-                    </button>
-                    {isCompletedTasksOpen && (
-                      <>
-                        {isFetchingCompletedTasks ? (
-                          <div className="text-center py-3">
-                            <div
-                              className="spinner-border text-primary"
-                              role="status"
-                              style={{ width: "1.5rem", height: "1.5rem" }}
-                            >
-                              <span className="visually-hidden">
-                                Loading...
-                              </span>
-                            </div>
-                            <p className="mt-2" style={{ fontSize: "12px" }}>
-                              Loading completed tasks...
-                            </p>
-                          </div>
-                        ) : completedTasks.length > 0 ? (
-                          <ul className="list-group list-group-flush">
-                            {completedTasks.map((task, index) =>
-                              task.isPenalty ? (
-                                <li
-                                  key={index}
-                                  style={styles.penaltyListGroupItem}
-                                  className="d-flex justify-content-between align-items-center py-1"
-                                >
-                                  <span>
-                                    {task.name}{" "}
-                                    <span className="fw-bold">Penalized</span>
-                                  </span>
-                                  <button
-                                    onClick={() => undoTask(index)}
-                                    className="btn btn-danger btn-sm"
-                                    style={{ fontSize: "10px" }}
-                                  >
-                                    Undo
-                                  </button>
-                                </li>
-                              ) : (
-                                <li
-                                  key={index}
-                                  style={styles.listGroupItem}
-                                  className="d-flex justify-content-between align-items-center py-1"
-                                >
-                                  <span>
-                                    <span className="fw-bold text-dark">
-                                      {task.completionCount}x
-                                    </span>{" "}
-                                    {task.name}{" "}
-                                    <small className="text-muted">
-                                      ({task.dailyCounter}/{task.dailyLimit})
-                                    </small>
-                                  </span>
-                                  <button
-                                    onClick={() => undoTask(index)}
-                                    className="btn btn-danger btn-sm"
-                                    style={{ fontSize: "10px" }}
-                                  >
-                                    Undo
-                                  </button>
-                                </li>
-                              )
-                            )}
-                          </ul>
-                        ) : (
-                          <p
-                            className="text-muted text-center small"
-                            style={{ fontSize: "12px" }}
-                          >
-                            No completed tasks this week.
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
               <div className="col-12 mb-3">
                 <div style={styles.dashboardCard} className="card shadow-sm">
                   <div style={styles.cardBody}>
@@ -1025,9 +487,10 @@ const NormalModeMobile = ({ globalTasks }) => {
                                 {categoryTasks.length > 0 ? (
                                   <ul className="list-group list-group-flush">
                                     {categoryTasks.map((task, taskIndex) => {
-                                      const originalIndex = tasks.findIndex(
-                                        (t) => t.name === task.name
-                                      );
+                                      const originalIndex =
+                                        userData.tasks.findIndex(
+                                          (t) => t.name === task.name
+                                        );
                                       const isCompleteDisabled =
                                         task.dailyCounter >= task.dailyLimit;
                                       return (
@@ -1139,8 +602,9 @@ const NormalModeMobile = ({ globalTasks }) => {
                                                 }`
                                               : ""}{" "}
                                             ) | Total: {task.completionCount}/
-                                            {task.numberLimit} | Daily:{" "}
-                                            {task.dailyCounter}/
+                                            {task.numberLimit}| Lifetime:{" "}
+                                            {task.lifetimeCompletionCount} |
+                                            Daily: {task.dailyCounter}/
                                             {task.dailyLimit}
                                           </small>
                                           {notifications
@@ -1185,10 +649,245 @@ const NormalModeMobile = ({ globalTasks }) => {
                   </div>
                 </div>
               </div>
+              <div className="col-12 mb-3">
+                <div style={styles.dashboardCard} className="card shadow-sm">
+                  <div style={styles.cardBody}>
+                    <h6 style={styles.cardTitle}>Daily Completed Tasks</h6>
+                    {userData.completedTasks.length > 0 ? (
+                      <ul className="list-group list-group-flush">
+                        {userData.completedTasks
+                          .filter((task) => task.dailyCounter > 0)
+                          .map((task, index) =>
+                            task.isPenalty ? (
+                              <li
+                                key={index}
+                                style={styles.penaltyListGroupItem}
+                                className="d-flex justify-content-between align-items-center py-1"
+                              >
+                                <span>
+                                  {task.name}{" "}
+                                  <span className="fw-bold">Penalized</span>
+                                </span>
+                                <button
+                                  onClick={() => undoTask(index)}
+                                  className="btn btn-danger btn-sm"
+                                  style={{ fontSize: "10px" }}
+                                >
+                                  Undo
+                                </button>
+                              </li>
+                            ) : (
+                              <li
+                                key={index}
+                                style={styles.listGroupItem}
+                                className="d-flex justify-content-between align-items-center py-1"
+                              >
+                                <span>
+                                  <span className="fw-bold text-dark">
+                                    {task.dailyCounter}x
+                                  </span>{" "}
+                                  {task.name}{" "}
+                                  <small className="text-muted">
+                                    ({task.dailyCounter}/{task.dailyLimit})
+                                  </small>
+                                </span>
+                                <button
+                                  onClick={() => undoTask(index)}
+                                  className="btn btn-danger btn-sm"
+                                  style={{ fontSize: "10px" }}
+                                >
+                                  Undo
+                                </button>
+                              </li>
+                            )
+                          )}
+                      </ul>
+                    ) : (
+                      <p
+                        className="text-muted text-center small"
+                        style={{ fontSize: "12px" }}
+                      >
+                        No completed tasks today.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="col-12 mb-3">
+                <div style={styles.dashboardCard} className="card shadow-sm">
+                  <div style={styles.cardBody}>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <h6 style={styles.cardTitle}>
+                        This Week Completed Tasks
+                      </h6>
+                      <button
+                        onClick={() => setIsWeeklyTasksOpen(!isWeeklyTasksOpen)}
+                        className="btn btn-sm btn-outline-primary"
+                        style={{ fontSize: "10px" }}
+                      >
+                        {isWeeklyTasksOpen ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                    {isWeeklyTasksOpen &&
+                      (userData.completedTasks.length > 0 ? (
+                        <ul className="list-group list-group-flush">
+                          {userData.completedTasks.map((task, index) =>
+                            task.isPenalty ? (
+                              <li
+                                key={index}
+                                style={styles.penaltyListGroupItem}
+                                className="d-flex justify-content-between align-items-center py-1"
+                              >
+                                <span>
+                                  {task.name}{" "}
+                                  <span className="fw-bold">Penalized</span>
+                                </span>
+                                <button
+                                  onClick={() => undoTask(index)}
+                                  className="btn btn-danger btn-sm"
+                                  style={{ fontSize: "10px" }}
+                                >
+                                  Undo
+                                </button>
+                              </li>
+                            ) : (
+                              <li
+                                key={index}
+                                style={styles.listGroupItem}
+                                className="d-flex justify-content-between align-items-center py-1"
+                              >
+                                <span>
+                                  <span className="fw-bold text-dark">
+                                    {task.completionCount}x
+                                  </span>{" "}
+                                  {task.name}{" "}
+                                  <small className="text-muted">
+                                    ({task.dailyCounter}/{task.dailyLimit})
+                                  </small>
+                                </span>
+                                <button
+                                  onClick={() => undoTask(index)}
+                                  className="btn btn-danger btn-sm"
+                                  style={{ fontSize: "10px" }}
+                                >
+                                  Undo
+                                </button>
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      ) : (
+                        <p
+                          className="text-muted text-center small"
+                          style={{ fontSize: "12px" }}
+                        >
+                          No completed tasks this week.
+                        </p>
+                      ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </>
         )}
       </div>
+
+      {isAchievementsOpen && (
+        <>
+          <div style={styles.overlay} onClick={toggleAchievements}></div>
+          <div style={styles.achievementsModal}>
+            <h5 style={{ fontSize: "14px" }}>Achievements</h5>
+            <button
+              onClick={toggleAchievements}
+              className="btn btn-danger btn-sm float-end"
+              style={{ fontSize: "10px" }}
+            >
+              Close
+            </button>
+            <div style={styles.achievementsContainer}>
+              {sortedCategories.map((category) => {
+                const achievements =
+                  JSON.parse(localStorage.getItem("achievements") || "{}")[
+                    category
+                  ] || [];
+                return (
+                  <div key={category} style={styles.achievementSection}>
+                    <h6>
+                      <button
+                        className={`btn btn-link ${
+                          !openAchievementSections[category] ? "collapsed" : ""
+                        }`}
+                        onClick={() => toggleAchievementSection(category)}
+                        style={{
+                          textDecoration: "none",
+                          color: "#000",
+                          fontSize: "12px",
+                        }}
+                      >
+                        {category} ({achievements.length})
+                      </button>
+                    </h6>
+                    {openAchievementSections[category] && (
+                      <ul className="list-group">
+                        {achievements.map((achievement) => {
+                          const task = userData.tasks.find(
+                            (t) => t.taskId === achievement.taskId
+                          );
+                          const progress = task
+                            ? task.lifetimeCompletionCount
+                            : 0;
+                          const isEarned =
+                            !!userData.achievements[achievement.name];
+                          const starColor = isEarned
+                            ? {
+                                bronze: "#cd7f32",
+                                silver: "#c0c0c0",
+                                gold: "#ffd700",
+                              }[userData.achievements[achievement.name].star]
+                            : "#ccc";
+                          return (
+                            <li
+                              key={achievement.name}
+                              className="list-group-item d-flex justify-content-between align-items-center"
+                              style={{ fontSize: "12px" }}
+                            >
+                              <div>
+                                <span
+                                  style={{
+                                    fontWeight: isEarned ? "bold" : "normal",
+                                    color: isEarned ? "#28a745" : "#000",
+                                  }}
+                                >
+                                  {achievement.name} - {achievement.description}
+                                </span>
+                                <br />
+                                <small style={{ fontSize: "10px" }}>
+                                  Progress: {progress}/{achievement.target}{" "}
+                                  {isEarned
+                                    ? `(Earned: ${new Date(
+                                        userData.achievements[
+                                          achievement.name
+                                        ].earnedAt
+                                      ).toLocaleDateString()})`
+                                    : ""}
+                                </small>
+                              </div>
+                              <i
+                                className="bi bi-star-fill"
+                                style={{ color: starColor, fontSize: "14px" }}
+                              ></i>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
