@@ -15,6 +15,7 @@ import GamePage from "./components/GamePage";
 import AdminPage from "./components/AdminPage";
 import Signup from "./components/Signup";
 import NormalModeContainer from "./components/NormalModeContainer";
+import WeeklyMode from "./components/WeeklyMode";
 
 const PrivateRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
@@ -73,6 +74,14 @@ function App() {
           element={
             <PrivateRoute>
               <NormalModeContainer />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/weekly-mode"
+          element={
+            <PrivateRoute>
+              <WeeklyMode />
             </PrivateRoute>
           }
         />

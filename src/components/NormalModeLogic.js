@@ -40,8 +40,13 @@ const STAR_TYPES = {
   Master: "gold",
 };
 
-export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
+export const useNormalModeLogic = (
+  globalTasks,
+  refreshGlobalTasks,
+  initialMode = "daily"
+) => {
   const navigate = useNavigate();
+  const [mode, setMode] = useState(initialMode);
   const [userId, setUserId] = useState(localStorage.getItem("userId"));
   const [userData, setUserData] = useState(() => {
     const storedData = localStorage.getItem(`userData_${userId}`);
@@ -64,6 +69,7 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
           cachedGlobalTasks[taskId]?.hasTimesOption ||
           false,
         selectedMode: parsedData.tasks[taskId]?.selectedMode || "normal",
+        bonusClaimed: parsedData.tasks[taskId]?.bonusClaimed || false, // New field to track bonus claim
       }));
     } else {
       initialTasks = Object.keys(cachedGlobalTasks).map((taskId) => ({
@@ -75,6 +81,7 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
         boost: null,
         hasTimesOption: cachedGlobalTasks[taskId].hasTimesOption || false,
         selectedMode: "normal",
+        bonusClaimed: false, // Initialize bonusClaimed
       }));
     }
 
@@ -98,7 +105,7 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
   const [taskTimes, setTaskTimes] = useState({});
   const [isCompletedTasksOpen, setIsCompletedTasksOpen] = useState(false);
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
-  const [authInitialized, setAuthInitialized] = useState(false); // Track auth initialization
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
     let timeoutId;
@@ -107,10 +114,9 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
       const storedUserId = localStorage.getItem("userId");
 
       if (!authInitialized) {
-        // Wait briefly for Firebase to stabilize auth state
         timeoutId = setTimeout(() => {
           setAuthInitialized(true);
-        }, 1000); // 1-second grace period
+        }, 1000);
         return;
       }
 
@@ -118,7 +124,6 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
         setUserId(user.uid);
         setIsLoading(false);
       } else if (!user && isLoggedIn) {
-        // Only logout if auth is fully initialized and user is still null
         setUserId(null);
         localStorage.removeItem("isLoggedIn");
         localStorage.removeItem("userId");
@@ -146,25 +151,37 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
   const syncWithFirebase = useCallback(
     async (forceSync = false) => {
       if (!userId) return;
+
       const localData =
         JSON.parse(localStorage.getItem(`userData_${userId}`)) || {};
+
       if (!forceSync && localData.lastUpdated === userData.lastUpdated) return;
 
       try {
         if (localData.tasks && localData.points) {
+          // Normalize tasks to an array if it's an object
+          const taskArray = Array.isArray(localData.tasks)
+            ? localData.tasks
+            : Object.entries(localData.tasks).map(([taskId, task]) => ({
+                taskId,
+                ...task,
+              }));
+
           const tasksToSync = Object.fromEntries(
-            localData.tasks.map((task) => [
+            taskArray.map((task) => [
               task.taskId,
               {
-                completionCount: task.completionCount,
-                lifetimeCompletionCount: task.lifetimeCompletionCount,
-                dailyCounter: task.dailyCounter,
-                boost: task.boost,
-                hasTimesOption: task.hasTimesOption,
-                selectedMode: task.selectedMode,
+                completionCount: task.completionCount || 0,
+                lifetimeCompletionCount: task.lifetimeCompletionCount || 0,
+                dailyCounter: task.dailyCounter || 0,
+                boost: task.boost || "",
+                hasTimesOption: task.hasTimesOption || false,
+                selectedMode: task.selectedMode || "normal",
+                bonusClaimed: task.bonusClaimed || false,
               },
             ])
           );
+
           await update(ref(database, `users/${userId}`), {
             ...localData,
             tasks: tasksToSync,
@@ -223,6 +240,7 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
               cachedGlobalTasks[taskId]?.hasTimesOption ||
               false,
             selectedMode: userTask.selectedMode || "normal",
+            bonusClaimed: userTask.bonusClaimed || false, // Initialize bonusClaimed
           };
         });
 
@@ -377,13 +395,112 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
     }));
   }, []);
 
+  const BONUS_POINTS = 10; // Default bonus points
+  const PERFECT_BONUS_POINTS = 50; // Bonus points when PerfectBonus boost is applied
+
+  const claimBonus = useCallback(
+    async (index) => {
+      const task = userData.tasks[index];
+      if (task.bonusClaimed) {
+        Swal.fire({
+          icon: "warning",
+          title: "Bonus Already Claimed",
+          text: `Bonus for "${task.name}" has already been claimed.`,
+        });
+        return;
+      }
+      if (task.category === "Bonus") {
+        Swal.fire({
+          icon: "info",
+          title: "No Bonus Available",
+          text: `Tasks in the "Bonus" category do not have a claimable bonus.`,
+        });
+        return;
+      }
+      if (task.completionCount < task.numberLimit) {
+        Swal.fire({
+          icon: "warning",
+          title: "Task Not Fully Completed",
+          text: `You must complete "${task.name}" ${task.numberLimit} times to claim the bonus.`,
+        });
+        return;
+      }
+
+      // Determine bonus points based on whether PerfectBonus boost is applied
+      const bonusPoints =
+        task.boost === "PerfectBonus" ? PERFECT_BONUS_POINTS : BONUS_POINTS;
+
+      const result = await Swal.fire({
+        title: "Claim Bonus?",
+        text: `Claim ${bonusPoints} bonus points for completing "${task.name}"?`,
+        icon: "question",
+        showCancelButton: true,
+      });
+
+      if (result.isConfirmed) {
+        const updatedTasks = userData.tasks.map((t, i) =>
+          i === index ? { ...t, bonusClaimed: true } : t
+        );
+        const newPointsData = {
+          ...userData.points,
+          current: userData.points.current + bonusPoints,
+        };
+        const newMpointsData = {
+          ...userData.Mpoints,
+          current: userData.Mpoints.current + bonusPoints,
+        };
+
+        updateLocalData({
+          tasks: updatedTasks,
+          points: newPointsData,
+          Mpoints: newMpointsData,
+        });
+
+        setNotifications((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            position: `task-${index}`,
+            points: bonusPoints,
+          },
+        ]);
+        setTimeout(
+          () =>
+            setNotifications((prev) => prev.filter((n) => n.id !== Date.now())),
+          3000
+        );
+
+        Swal.fire({
+          icon: "success",
+          title: "Bonus Claimed!",
+          text: `${bonusPoints} bonus points added for "${task.name}".`,
+        });
+      }
+    },
+    [userData, updateLocalData]
+  );
+
+  const switchMode = useCallback(
+    (newMode) => {
+      setMode(newMode);
+      navigate(newMode === "daily" ? "/normal-mode" : "/weekly-mode");
+    },
+    [navigate]
+  );
+
   const completeTask = useCallback(
     (index) => {
       const task = userData.tasks[index];
       if (!task || typeof task.points !== "number") return;
 
       const times = task.hasTimesOption ? taskTimes[index] || 1 : 1;
-      if (task.dailyCounter + times > task.dailyLimit) {
+      // Skip dailyLimit check if "TheSavior" boost is applied
+
+      if (
+        mode === "daily" &&
+        task.boost !== "TheSavior" &&
+        task.dailyCounter + times > task.dailyLimit
+      ) {
         Swal.fire({
           icon: "warning",
           title: "Daily Limit Reached",
@@ -411,7 +528,6 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
       }
 
       let effectivePoints = task.points;
-      let bonusPoints = 0;
       if (task.hasExceptionalOption) {
         if (task.selectedMode === "exceptional")
           effectivePoints = task.points / 2;
@@ -427,15 +543,6 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
         else if (boost.percentage) effectivePoints *= 1 + boost.percentage;
       }
       const totalPoints = effectivePoints * times;
-      if (
-        newCompletionCount === task.numberLimit &&
-        (!task.hasExceptionalOption || task.selectedMode !== "penalty")
-      ) {
-        bonusPoints =
-          task.boost === "PerfectBonus"
-            ? BOOSTS["PerfectBonus"].bonus
-            : BONUS_POINTS;
-      }
 
       const updatedTask = {
         ...task,
@@ -457,7 +564,6 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
           basePoints: task.points,
           points: totalPoints,
           completionCount: times,
-          bonusPoints,
           boost: task.boost || null,
           numberLimit: task.numberLimit,
           hasTimesOption: task.hasTimesOption,
@@ -476,6 +582,7 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
               }
             : {}),
           ...(task.hasTimesOption ? { times } : {}),
+          timestamp: Date.now(),
         });
       } else {
         const existingTask = newCompletedTasks[existingIndex];
@@ -483,15 +590,10 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
           ...existingTask,
           points: existingTask.points + totalPoints,
           completionCount: existingTask.completionCount + times,
-          bonusPoints:
-            newCompletionCount === task.numberLimit && !existingTask.bonusPoints
-              ? bonusPoints
-              : existingTask.bonusPoints,
           dailyCounter: existingTask.dailyCounter + times,
         };
       }
 
-      // Check achievements and assign stars
       const cachedAchievements =
         JSON.parse(localStorage.getItem("achievements")) || {};
       const newAchievements = { ...userData.achievements };
@@ -503,11 +605,11 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
               newLifetimeCompletionCount >= achievement.target &&
               !newAchievements[achievement.name]
             ) {
-              const starType = STAR_TYPES[category] || "bronze"; // Default to bronze if category not mapped
+              const starType = STAR_TYPES[category] || "bronze";
               newAchievements[achievement.name] = {
                 ...achievement,
                 earnedAt: Date.now(),
-                star: starType, // Assign star based on category
+                star: starType,
               };
               Swal.fire({
                 icon: "success",
@@ -521,17 +623,11 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
 
       const newPointsData = {
         ...userData.points,
-        current: Math.max(
-          userData.points.current + totalPoints + bonusPoints,
-          0
-        ),
+        current: Math.max(userData.points.current + totalPoints, 0),
       };
       const newMpointsData = {
         ...userData.Mpoints,
-        current: Math.max(
-          userData.Mpoints.current + totalPoints + bonusPoints,
-          0
-        ),
+        current: Math.max(userData.Mpoints.current + totalPoints, 0),
       };
       updateLocalData({
         tasks: newTasks,
@@ -547,7 +643,7 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
         {
           id: Date.now(),
           position: `task-${index}`,
-          points: totalPoints + bonusPoints,
+          points: totalPoints,
         },
       ]);
       setTimeout(
@@ -556,18 +652,19 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
         3000
       );
     },
-    [userData, taskTimes, updateLocalData]
+    [userData, taskTimes, updateLocalData, mode]
   );
-
   const undoTask = useCallback(
     (index) => {
       const task = userData.completedTasks[index];
       const taskIndex = userData.tasks.findIndex((t) => t.name === task.name);
       const originalTask = taskIndex !== -1 ? userData.tasks[taskIndex] : null;
 
+      if (!task || !originalTask) return; // Safety check
+
       const newCompletionCount = Math.max(task.completionCount - 1, 0);
       const newLifetimeCompletionCount = Math.max(
-        originalTask?.lifetimeCompletionCount - 1 || 0,
+        originalTask.lifetimeCompletionCount - 1,
         0
       );
       const newDailyCounter = Math.max(task.dailyCounter - 1, 0);
@@ -578,38 +675,33 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
         else if (task.selectedMode === "exceptional")
           pointsToAdjust = task.basePoints / 2;
       }
-      if (task.bonusPoints && task.completionCount === task.numberLimit)
-        pointsToAdjust += task.bonusPoints;
 
       const newCompletedTasks = [...userData.completedTasks];
-      if (newCompletionCount > 0) {
+      if (newDailyCounter > 0) {
         newCompletedTasks[index] = {
           ...task,
           completionCount: newCompletionCount,
           points: task.points - pointsToAdjust,
           dailyCounter: newDailyCounter,
-          bonusPoints:
-            newCompletionCount === task.numberLimit - 1 ? 0 : task.bonusPoints,
           ...(task.hasTimesOption
             ? { times: Math.max((task.times || task.completionCount) - 1, 0) }
             : {}),
         };
       } else {
-        newCompletedTasks.splice(index, 1);
+        newCompletedTasks.splice(index, 1); // Remove from completedTasks if dailyCounter is 0
       }
 
-      const newTasks = originalTask
-        ? userData.tasks.map((t, i) =>
-            i === taskIndex
-              ? {
-                  ...t,
-                  completionCount: Math.max(t.completionCount - 1, 0),
-                  lifetimeCompletionCount: newLifetimeCompletionCount,
-                  dailyCounter: newDailyCounter,
-                }
-              : t
-          )
-        : userData.tasks;
+      const newTasks = userData.tasks.map((t, i) =>
+        i === taskIndex
+          ? {
+              ...t,
+              completionCount: Math.max(t.completionCount - 1, 0),
+              lifetimeCompletionCount: newLifetimeCompletionCount,
+              dailyCounter: newDailyCounter,
+            }
+          : t
+      );
+
       const newPointsData = {
         ...userData.points,
         current: Math.max(userData.points.current - pointsToAdjust, 0),
@@ -618,6 +710,7 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
         ...userData.Mpoints,
         current: Math.max(userData.Mpoints.current - pointsToAdjust, 0),
       };
+
       updateLocalData({
         tasks: newTasks,
         completedTasks: newCompletedTasks,
@@ -628,11 +721,79 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
     [userData, updateLocalData]
   );
 
+  const missTask = useCallback(
+    (index) => {
+      const task = userData.tasks[index];
+      if (task.boost !== "DoubleOrDie") return;
+
+      const newPointsData = {
+        ...userData.points,
+        current: Math.max(userData.points.current - 10, 0),
+      };
+      const newMpointsData = {
+        ...userData.Mpoints,
+        current: Math.max(userData.Mpoints.current - 10, 0),
+      };
+      updateLocalData({
+        points: newPointsData,
+        Mpoints: newMpointsData,
+      });
+      Swal.fire({
+        icon: "warning",
+        title: "Task Missed",
+        text: `10 points deducted for missing "${task.name}".`,
+      });
+    },
+    [userData, updateLocalData]
+  );
+
+  const adjustPoints = useCallback(
+    (amount) => {
+      const newPointsData = {
+        ...userData.points,
+        current: Math.max(userData.points.current + amount, 0),
+      };
+      const newMpointsData = {
+        ...userData.Mpoints,
+        current: Math.max(userData.Mpoints.current + amount, 0),
+      };
+      updateLocalData({
+        points: newPointsData,
+        Mpoints: newMpointsData,
+      });
+      Swal.fire({
+        icon: "success",
+        title: "Points Adjusted",
+        text: `Points changed by ${amount > 0 ? "+" : ""}${amount}pts.`,
+      });
+    },
+    [userData.points, userData.Mpoints, updateLocalData]
+  );
+
+  const adjustMonthlyPoints = useCallback(
+    (amount) => {
+      const newMpointsData = {
+        ...userData.Mpoints,
+        current: Math.max(userData.Mpoints.current + amount, 0),
+      };
+      updateLocalData({
+        Mpoints: newMpointsData,
+      });
+      Swal.fire({
+        icon: "success",
+        title: "Monthly Points Adjusted",
+        text: `Monthly points changed by ${amount > 0 ? "+" : ""}${amount}pts.`,
+      });
+    },
+    [userData.Mpoints, updateLocalData]
+  );
   const resetTaskCompletionCount = useCallback(
     (index) => {
       const task = userData.tasks[index];
       const updatedTasks = userData.tasks.map((t, i) =>
-        i === index ? { ...t, completionCount: 0, dailyCounter: 0 } : t
+        i === index
+          ? { ...t, completionCount: 0, dailyCounter: 0, bonusClaimed: false }
+          : t
       );
       updateLocalData({ tasks: updatedTasks });
       Swal.fire({
@@ -650,7 +811,9 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
       taskMap.set(completedTask.name, { ...completedTask, dailyCounter: 0 })
     );
     const resetTasks = userData.tasks.map((task) =>
-      taskMap.get(task.name) ? { ...task, dailyCounter: 0 } : task
+      taskMap.get(task.name)
+        ? { ...task, dailyCounter: 0, bonusClaimed: false }
+        : task
     );
     updateLocalData({ tasks: resetTasks, completedTasks: [] });
     Swal.fire({
@@ -665,6 +828,7 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
       ...task,
       completionCount: 0,
       dailyCounter: 0,
+      bonusClaimed: false,
     }));
     updateLocalData({ tasks: resetTasks });
     Swal.fire({
@@ -720,7 +884,7 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
       await update(ref(database, `users/${userId}/historicalCompletions`), {
         [weekArchive.weekNumber]: weekArchive.completedTasks.reduce(
           (acc, task) => {
-            acc[task.taskId || task.name] = task.completionCount;
+            acc[task.taskId] = task.completionCount;
             return acc;
           },
           {}
@@ -734,8 +898,9 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
             ...task,
             completionCount: 0,
             dailyCounter: 0,
-            boost: null, // Remove boost
-            hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior", // Reset hasTimesOption if it was set by TheSavior
+            boost: null,
+            hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
+            bonusClaimed: false, // Reset bonusClaimed
           };
           return acc;
         }, {}),
@@ -746,8 +911,9 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
         ...task,
         completionCount: 0,
         dailyCounter: 0,
-        boost: null, // Remove boost
-        hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior", // Reset hasTimesOption if it was set by TheSavior
+        boost: null,
+        hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
+        bonusClaimed: false, // Reset bonusClaimed
       }));
       updateLocalData({
         tasks: resetTasks,
@@ -777,7 +943,6 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
   }, [userData, updateLocalData, userId]);
 
   const startTheDay = useCallback(() => {
-    // Check for DoubleOrDie tasks not completed today
     const doubleOrDieTasks = userData.tasks.filter(
       (task) => task.boost === "DoubleOrDie"
     );
@@ -788,13 +953,14 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
           completed.name === task.name && completed.dailyCounter > 0
       );
       if (!completedToday) {
-        penalty += 10; // Deduct 10 points for each missed DoubleOrDie task
+        penalty += 10;
       }
     });
 
     const resetTasks = userData.tasks.map((task) => ({
       ...task,
       dailyCounter: 0,
+      bonusClaimed: false, // Reset bonusClaimed daily
     }));
     const resetCompletedTasks = userData.completedTasks.map((task) => ({
       ...task,
@@ -855,7 +1021,10 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
     applyBoost,
     removeBoost,
     handleTimesChange,
+    mode,
+    switchMode,
     completeTask,
+    missTask,
     undoTask,
     resetTaskCompletionCount,
     resetCompletedTasks,
@@ -869,5 +1038,8 @@ export const useNormalModeLogic = (globalTasks, refreshGlobalTasks) => {
     isAchievementsOpen,
     toggleAchievements,
     refreshGlobalTasks,
+    claimBonus,
+    adjustPoints,
+    adjustMonthlyPoints,
   };
 };

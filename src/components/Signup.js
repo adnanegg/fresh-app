@@ -30,6 +30,7 @@ const Signup = () => {
       );
       const user = userCredential.user;
       const userId = user.uid;
+
       const now = Date.now();
 
       const globalTasksRef = ref(database, "globalTasks");
@@ -38,6 +39,7 @@ const Signup = () => {
 
       // Cache globalTasks in localStorage
       localStorage.setItem("globalTasks", JSON.stringify(globalTasks));
+      localStorage.setItem("userId", userId);
 
       const initialTasks = Object.fromEntries(
         Object.keys(globalTasks).map((taskId) => [
@@ -54,8 +56,8 @@ const Signup = () => {
 
       const initialUserData = {
         profile: { name, timezone },
-        points: { current: 0, total: 4500 },
-        Mpoints: { current: 0, total: 12000 },
+        points: { current: 0, total: 800 },
+        Mpoints: { current: 0, total: 2800 },
         tasks: initialTasks,
         completedTasks: [],
         lastUpdated: now,

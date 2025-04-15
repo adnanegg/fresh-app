@@ -306,7 +306,8 @@ const Statistics = () => {
                             <span>{task.name}</span>
                             <span>
                               <span className="badge bg-primary me-2">
-                                Overall: {taskOverallPerf}%
+                                Overall: {taskOverallPerf}% (
+                                {totalTaskCompletion}/{totalTaskPossible})
                               </span>
                               <span className="badge bg-success">
                                 Week: {weeklyPerf}%

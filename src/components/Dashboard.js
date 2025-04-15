@@ -19,6 +19,13 @@ const Dashboard = () => {
     nickname: "",
     score: "",
     message: "",
+    BookP: "0%",
+    QuoranP: "0%",
+    PrayerP: "0%",
+    SportP: "0%",
+    QuranListenP: "0%",
+    Improvement15minP: "0%",
+    WakeUpEarlyP: "0%",
   });
   const [monthlyScoreFormData, setMonthlyScoreFormData] = useState({
     timestamp: new Date().toLocaleTimeString(),
@@ -65,70 +72,154 @@ const Dashboard = () => {
 
   const fetchUserData = useCallback(async (userId) => {
     try {
-      const [profileSnap, pointsSnap, mPointsSnap, achievementsSnap] =
-        await Promise.all([
-          get(ref(database, `users/${userId}/profile`)),
-          get(ref(database, `users/${userId}/points`)),
-          get(ref(database, `users/${userId}/Mpoints`)),
-          get(ref(database, `users/${userId}/achievements`)),
-        ]);
+      const [
+        profileSnap,
+        pointsSnap,
+        mPointsSnap,
+        achievementsSnap,
+        tasksSnap,
+        globalTasksSnap,
+      ] = await Promise.all([
+        get(ref(database, `users/${userId}/profile`)),
+        get(ref(database, `users/${userId}/points`)),
+        get(ref(database, `users/${userId}/Mpoints`)),
+        get(ref(database, `users/${userId}/achievements`)),
+        get(ref(database, `users/${userId}/tasks`)),
+        get(ref(database, "globalTasks")),
+      ]);
 
-      const profileData = profileSnap.val() || { name: "User" };
-      const points = pointsSnap.val() || { current: 0, total: 800 };
-      const mpoints = mPointsSnap.val() || { current: 0, total: 2800 };
-      const achievements = achievementsSnap.val() || {};
+      const firebaseData = {
+        profile: profileSnap.val() || { name: "User" },
+        points: pointsSnap.val() || { current: 0, total: 800 },
+        Mpoints: mPointsSnap.val() || { current: 0, total: 2800 },
+        achievements: achievementsSnap.val() || {},
+        tasks: tasksSnap.val() || {},
+        lastUpdated: Date.now(),
+      };
 
-      setUserProfile((prev) => {
-        if (prev.name !== profileData.name) {
-          return profileData;
-        }
-        return prev;
-      });
+      const globalTasks = globalTasksSnap.val() || {};
 
-      setPointsData((prev) => {
-        if (prev.current !== points.current || prev.total !== points.total) {
-          return points;
-        }
-        return prev;
-      });
+      setUserProfile(firebaseData.profile);
+      setPointsData(firebaseData.points);
+      setMpointsData(firebaseData.Mpoints);
+      setAchievementsData(firebaseData.achievements);
 
-      setMpointsData((prev) => {
-        if (prev.current !== mpoints.current || prev.total !== mpoints.total) {
-          return mpoints;
-        }
-        return prev;
-      });
+      const taskPercentages = [
+        "book_read",
+        "quran_read",
+        "prayer_mosque",
+        "sport_exercise",
+        "quran_listen",
+        "improvement_15min",
+        "wake_up_early",
+      ].reduce((acc, taskId) => {
+        const task = firebaseData.tasks[taskId] || {};
+        const globalTask = globalTasks[taskId] || {};
+        const percentage =
+          globalTask.numberLimit > 0
+            ? Math.round((task.completionCount / globalTask.numberLimit) * 100)
+            : 0;
+        return {
+          ...acc,
+          [taskId === "book_read"
+            ? "BookP"
+            : taskId === "quran_read"
+            ? "QuoranP"
+            : taskId === "prayer_mosque"
+            ? "PrayerP"
+            : taskId === "sport_exercise"
+            ? "SportP"
+            : taskId === "quran_listen"
+            ? "QuranListenP"
+            : taskId === "improvement_15min"
+            ? "Improvement15minP"
+            : "WakeUpEarlyP"]: `${percentage}%`,
+        };
+      }, {});
 
-      setAchievementsData((prev) => {
-        const prevAchievements = JSON.stringify(prev);
-        const newAchievements = JSON.stringify(achievements);
-        if (prevAchievements !== newAchievements) {
-          return achievements;
-        }
-        return prev;
-      });
+      setScoreFormData((prev) => ({
+        ...prev,
+        ...taskPercentages,
+        nickname: firebaseData.profile.name,
+        score: firebaseData.points.current.toString(),
+        timestamp: new Date().toLocaleTimeString(),
+      }));
 
-      localStorage.setItem(
-        `userData_${userId}`,
-        JSON.stringify({
-          profile: profileData,
-          points: points,
-          Mpoints: mpoints,
-          achievements: achievements,
-          lastUpdated: Date.now(),
-        })
-      );
+      localStorage.setItem(`userData_${userId}`, JSON.stringify(firebaseData));
+      localStorage.setItem("globalTasks", JSON.stringify(globalTasks));
 
       if (auth.currentUser?.email === "admin@gmail.com") {
         setIsAdmin(true);
       }
-    } catch (error) {
-      console.error("Fetch error:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Fetch Failed",
-        text: "Could not load dashboard data.",
-      });
+    } catch (firebaseError) {
+      console.error("Firebase fetch failed, trying cache:", firebaseError);
+      try {
+        const cachedUserData =
+          JSON.parse(localStorage.getItem(`userData_${userId}`)) || {};
+        const cachedGlobalTasks =
+          JSON.parse(localStorage.getItem("globalTasks")) || {};
+
+        setUserProfile(cachedUserData.profile || { name: "User" });
+        setPointsData(cachedUserData.points || { current: 0, total: 800 });
+        setMpointsData(cachedUserData.Mpoints || { current: 0, total: 2800 });
+        setAchievementsData(cachedUserData.achievements || {});
+
+        const cachedTaskPercentages = [
+          "book_read",
+          "quran_read",
+          "prayer_mosque",
+          "sport_exercise",
+          "quran_listen",
+          "improvement_15min",
+          "wake_up_early",
+        ].reduce((acc, taskId) => {
+          const task = cachedUserData.tasks?.[taskId] || {};
+          const globalTask = cachedGlobalTasks[taskId] || {};
+          const percentage =
+            globalTask.numberLimit > 0
+              ? Math.round(
+                  (task.completionCount / globalTask.numberLimit) * 100
+                )
+              : 0;
+          return {
+            ...acc,
+            [taskId === "book_read"
+              ? "BookP"
+              : taskId === "quran_read"
+              ? "QuoranP"
+              : taskId === "prayer_mosque"
+              ? "PrayerP"
+              : taskId === "sport_exercise"
+              ? "SportP"
+              : taskId === "quran_listen"
+              ? "QuranListenP"
+              : taskId === "improvement_15min"
+              ? "Improvement15minP"
+              : "WakeUpEarlyP"]: `${percentage}%`,
+          };
+        }, {});
+
+        setScoreFormData((prev) => ({
+          ...prev,
+          ...cachedTaskPercentages,
+          nickname: cachedUserData.profile?.name || "",
+          score: cachedUserData.points?.current?.toString() || "0",
+          timestamp: new Date().toLocaleTimeString(),
+        }));
+
+        Swal.fire({
+          icon: "warning",
+          title: "Using Cached Data",
+          text: "Couldn't connect to server. Showing last saved data.",
+        });
+      } catch (cacheError) {
+        console.error("Cache read failed:", cacheError);
+        Swal.fire({
+          icon: "error",
+          title: "Data Load Failed",
+          text: "Couldn't load data from server or cache.",
+        });
+      }
     }
   }, []);
 
@@ -165,11 +256,128 @@ const Dashboard = () => {
     return () => unsubscribeAuth();
   }, [navigate, fetchUserData]);
 
+  const submitAllUserForms = async () => {
+    try {
+      Swal.fire({
+        title: "Processing...",
+        html: "Submitting all user weekly data",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+      const usersSnapshot = await get(ref(database, "users"));
+      if (!usersSnapshot.exists()) {
+        Swal.fire("No users found");
+        return;
+      }
+      const users = usersSnapshot.val();
+      const userIds = Object.keys(users).filter(
+        (userId) => users[userId].profile && users[userId].points
+      );
+      const globalTasksSnap = await get(ref(database, "globalTasks"));
+      const globalTasks = globalTasksSnap.val() || {};
+      let successCount = 0,
+        errorCount = 0;
+      for (const userId of userIds) {
+        try {
+          const tasks = users[userId].tasks || {};
+          const taskPercentages = [
+            "book_read",
+            "quran_read",
+            "prayer_mosque",
+            "sport_exercise",
+            "quran_listen",
+            "improvement_15min",
+            "wake_up_early",
+          ].reduce((acc, taskId) => {
+            const task = tasks[taskId] || {};
+            const globalTask = globalTasks[taskId] || {};
+            const percentage =
+              globalTask.numberLimit > 0
+                ? Math.round(
+                    (task.completionCount / globalTask.numberLimit) * 100
+                  )
+                : 0;
+            return {
+              ...acc,
+              [taskId === "book_read"
+                ? "BookP"
+                : taskId === "quran_read"
+                ? "QuoranP"
+                : taskId === "prayer_mosque"
+                ? "PrayerP"
+                : taskId === "sport_exercise"
+                ? "SportP"
+                : taskId === "quran_listen"
+                ? "QuranListenP"
+                : taskId === "improvement_15min"
+                ? "Improvement15minP"
+                : "WakeUpEarlyP"]: `${percentage}%`,
+            };
+          }, {});
+
+          const formData = new FormData();
+          formData.append("Time", new Date().toLocaleTimeString());
+          formData.append("Nickname", users[userId].profile.name || "User");
+          formData.append(
+            "Score",
+            users[userId].points.current.toString() || "0"
+          );
+          formData.append("Message", "Admin-submitted");
+          formData.append("BookP", taskPercentages.BookP || "0%");
+          formData.append("QuoranP", taskPercentages.QuoranP || "0%");
+          formData.append("PrayerP", taskPercentages.PrayerP || "0%");
+          formData.append("SportP", taskPercentages.SportP || "0%");
+          formData.append("QuranListenP", taskPercentages.QuranListenP || "0%");
+          formData.append(
+            "Improvement15minP",
+            taskPercentages.Improvement15minP || "0%"
+          );
+          formData.append("WakeUpEarlyP", taskPercentages.WakeUpEarlyP || "0%");
+
+          console.log(
+            `Weekly formData for ${userId}:`,
+            Object.fromEntries(formData)
+          );
+
+          const response = await fetch(
+            "https://script.google.com/macros/s/AKfycbzOctGECippPoRgLhx-r8urusRpDfniFctGYgv-m7FG_LKDjIKbqPw7n6GTFE1jK8X4/exec",
+            { method: "POST", body: formData }
+          );
+          if (response.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+            console.error(
+              `Failed to submit weekly for user ${userId}: ${response.status}`
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        } catch (error) {
+          errorCount++;
+          console.error(`Error submitting weekly for user ${userId}:`, error);
+        }
+      }
+      Swal.fire({
+        icon: "success",
+        title: "Weekly Submission Complete",
+        html: `<div style="text-align: left;"><p><strong>Total users processed:</strong> ${userIds.length}</p><p><strong>Successful submissions:</strong> ${successCount}</p><p><strong>Failed submissions:</strong> ${errorCount}</p></div>`,
+        confirmButtonText: "OK",
+      });
+    } catch (error) {
+      console.error("Weekly submission error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Weekly Submission Failed",
+        text: error.message || "Error starting the submission process",
+      });
+    }
+  };
+
   const submitAllUserMonthlyForms = async () => {
     try {
       Swal.fire({
         title: "Processing...",
-        html: "Submitting all user monthly forms",
+        html: "Submitting all user monthly data",
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
@@ -190,8 +398,11 @@ const Dashboard = () => {
           const formData = new FormData();
           formData.append("Timing", new Date().toLocaleTimeString());
           formData.append("Name", users[userId].profile.name || "User");
-          formData.append("Mscore", users[userId].Mpoints.current || 0);
-          formData.append("Mess", "Auto-submitted monthly by admin");
+          formData.append(
+            "Mscore",
+            users[userId].Mpoints.current.toString() || "0"
+          );
+          formData.append("Mess", "Admin-submitted");
           formData.append(
             "Bronze",
             Object.values(achievements)
@@ -211,14 +422,22 @@ const Dashboard = () => {
               .length.toString() || "0"
           );
 
+          console.log(
+            `Monthly formData for ${userId}:`,
+            Object.fromEntries(formData)
+          );
+
           const response = await fetch(
             "https://script.google.com/macros/s/AKfycbxbdUof2Sj7sPXUjHmNaFK2Fn8D3aENPAqe5GKH_5d1KoSrKZh8HdOHOMw0dIN4sFS-tQ/exec",
             { method: "POST", body: formData }
           );
-          if (response.ok) successCount++;
-          else {
+          if (response.ok) {
+            successCount++;
+          } else {
             errorCount++;
-            console.error(`Failed to submit monthly for user ${userId}`);
+            console.error(
+              `Failed to submit monthly for user ${userId}: ${response.status}`
+            );
           }
           await new Promise((resolve) => setTimeout(resolve, 300));
         } catch (error) {
@@ -237,63 +456,6 @@ const Dashboard = () => {
       Swal.fire({
         icon: "error",
         title: "Monthly Submission Failed",
-        text: error.message || "Error starting the monthly submission process",
-      });
-    }
-  };
-
-  const submitAllUserForms = async () => {
-    try {
-      Swal.fire({
-        title: "Processing...",
-        html: "Submitting all user forms",
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading(),
-      });
-      const usersSnapshot = await get(ref(database, "users"));
-      if (!usersSnapshot.exists()) {
-        Swal.fire("No users found");
-        return;
-      }
-      const users = usersSnapshot.val();
-      const userIds = Object.keys(users).filter(
-        (userId) => users[userId].profile && users[userId].points
-      );
-      let successCount = 0,
-        errorCount = 0;
-      for (const userId of userIds) {
-        try {
-          const formData = new FormData();
-          formData.append("Time", new Date().toLocaleTimeString());
-          formData.append("Nickname", users[userId].profile.name || "User");
-          formData.append("Score", users[userId].points.current || 0);
-          formData.append("Message", "Auto-submitted by admin");
-          const response = await fetch(
-            "https://script.google.com/macros/s/AKfycbxbPwffOvyWQjdN8smVC8frGxXqPggXd2Ea1L8tQ4NTWGDwq8EFNEmdLoOOu11qCNv8/exec",
-            { method: "POST", body: formData }
-          );
-          if (response.ok) successCount++;
-          else {
-            errorCount++;
-            console.error(`Failed to submit for user ${userId}`);
-          }
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        } catch (error) {
-          errorCount++;
-          console.error(`Error submitting for user ${userId}:`, error);
-        }
-      }
-      Swal.fire({
-        icon: "success",
-        title: "Submission Complete",
-        html: `<div style="text-align: left;"><p><strong>Total users processed:</strong> ${userIds.length}</p><p><strong>Successful submissions:</strong> ${successCount}</p><p><strong>Failed submissions:</strong> ${errorCount}</p></div>`,
-        confirmButtonText: "OK",
-      });
-    } catch (error) {
-      console.error("Submission error:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Submission Failed",
         text: error.message || "Error starting the submission process",
       });
     }
@@ -425,84 +587,6 @@ const Dashboard = () => {
     }
   };
 
-  const handleFieldUpdate = (field, value) => {
-    setScoreFormData((prev) => ({
-      ...prev,
-      [field]: value,
-      timestamp: new Date().toLocaleTimeString(),
-    }));
-  };
-
-  const handleFieldMonthlyUpdate = (field, value) => {
-    setMonthlyScoreFormData((prev) => ({
-      ...prev,
-      [field]: value,
-      timestamp: new Date().toLocaleTimeString(),
-    }));
-  };
-
-  const Submit = (e) => {
-    e.preventDefault();
-    const formEle = e.target;
-    const formDatab = new FormData(formEle);
-    formDatab.set("Time", new Date().toLocaleTimeString());
-    fetch(
-      "https://script.google.com/macros/s/AKfycbxbPwffOvyWQjdN8smVC8frGxXqPggXd2Ea1L8tQ4NTWGDwq8EFNEmdLoOOu11qCNv8/exec",
-      { method: "POST", body: formDatab }
-    )
-      .then((res) => res.text())
-      .then((data) => {
-        Swal.fire({
-          icon: "success",
-          title: "Submission Successful!",
-          text: "Your weekly score has been submitted.",
-        });
-        setScoreFormData((prev) => ({ ...prev, message: "" }));
-      })
-      .catch((error) => {
-        console.error("Weekly submission error:", error);
-        Swal.fire({
-          icon: "error",
-          title: "Submission Failed",
-          text: "There was an error submitting your weekly score.",
-        });
-      });
-  };
-
-  const SubmitMonthly = (e) => {
-    e.preventDefault();
-    const formEle = e.target;
-    const formDatab = new FormData(formEle);
-    formDatab.set("Timing", new Date().toLocaleTimeString());
-    formDatab.set("Name", monthlyScoreFormData.nickname);
-    formDatab.set("Mscore", monthlyScoreFormData.score);
-    formDatab.set("Mess", monthlyScoreFormData.message);
-    formDatab.set("Bronze", monthlyScoreFormData.bronze);
-    formDatab.set("Silver", monthlyScoreFormData.silver);
-    formDatab.set("Gold", monthlyScoreFormData.gold);
-    fetch(
-      "https://script.google.com/macros/s/AKfycbxbdUof2Sj7sPXUjHmNaFK2Fn8D3aENPAqe5GKH_5d1KoSrKZh8HdOHOMw0dIN4sFS-tQ/exec",
-      { method: "POST", body: formDatab }
-    )
-      .then((res) => res.text())
-      .then((data) => {
-        Swal.fire({
-          icon: "success",
-          title: "Submission Successful!",
-          text: "Your monthly score has been submitted.",
-        });
-        setMonthlyScoreFormData((prev) => ({ ...prev, message: "" }));
-      })
-      .catch((error) => {
-        console.error("Monthly submission error:", error);
-        Swal.fire({
-          icon: "error",
-          title: "Submission Failed",
-          text: "There was an error submitting your monthly score.",
-        });
-      });
-  };
-
   const styles = {
     containerFluid: { padding: 0, overflow: "hidden" },
     logo: { width: "32px", height: "32px", marginRight: "8px" },
@@ -617,21 +701,6 @@ const Dashboard = () => {
       transform: "translateY(-50%)",
       color: "#b8860b",
       fontSize: "18px",
-    },
-    scoreFormSubmit: {
-      width: "100%",
-      padding: "12px",
-      background: "linear-gradient(135deg, #ffd700, #b8860b)",
-      color: "#fff",
-      border: "none",
-      borderRadius: "8px",
-      cursor: "pointer",
-      fontSize: "18px",
-      fontWeight: "bold",
-      textShadow: "1px 1px 2px rgba(0, 0, 0, 0.3)",
-      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
-      transition: "transform 0.2s ease, box-shadow 0.2s ease",
-      display: isVisible ? "block" : "none",
     },
     videoBackground: {
       position: "fixed",
@@ -798,7 +867,7 @@ const Dashboard = () => {
           }}
         >
           <Link
-            to="/normal-mode"
+            to="/weekly-mode"
             style={{
               ...styles.topBarLink,
               backgroundColor: "#28a745",
@@ -851,14 +920,14 @@ const Dashboard = () => {
               className="btn btn-danger w-100 mb-2"
               style={{ padding: "10px", position: "relative", zIndex: 100 }}
             >
-              <i className="bi bi-send-fill me-2"></i>Submit All Weekly Forms
+              <i className="bi bi-send-fill me-2"></i>Submit All Weekly Data
             </button>
             <button
               onClick={submitAllUserMonthlyForms}
               className="btn btn-danger w-100"
               style={{ padding: "10px", position: "relative", zIndex: 100 }}
             >
-              <i className="bi bi-send-fill me-2"></i>Submit All Monthly Forms
+              <i className="bi bi-send-fill me-2"></i>Submit All Monthly Data
             </button>
           </div>
         )}
@@ -997,214 +1066,210 @@ const Dashboard = () => {
           <div className="col-12 col-md-6 mb-3">
             <div style={styles.scoreFormCard} className="card shadow-sm">
               <div style={styles.cardBody} className="p-3">
-                <h3 style={styles.scoreFormTitle}>Weekly Score</h3>
-                <form className="form" onSubmit={Submit}>
-                  <div style={styles.scoreFormInputWrapper}>
-                    <i
-                      className="bi bi-clock-fill"
-                      style={styles.scoreFormInputIcon}
-                    ></i>
-                    <input
-                      placeholder="Time of Submission"
-                      name="Time"
-                      type="text"
-                      value={scoreFormData.timestamp}
-                      readOnly
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    />
+                <h3 style={styles.scoreFormTitle}>Stats</h3>
+                <div>
+                  <div className="row">
+                    <div className="col-12 col-md-4 mb-3">
+                      <div style={styles.scoreFormInputWrapper}>
+                        <span
+                          style={{
+                            ...styles.scoreFormInputIcon,
+                            fontSize: "16px",
+                            color: "#b8860b",
+                          }}
+                        >
+                          Book:
+                        </span>
+                        <p
+                          style={{
+                            ...styles.scoreFormInput,
+                            paddingLeft: "60px",
+                          }}
+                          className="score-form-input"
+                        >
+                          {scoreFormData.BookP}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="col-12 col-md-4 mb-3">
+                      <div style={styles.scoreFormInputWrapper}>
+                        <span
+                          style={{
+                            ...styles.scoreFormInputIcon,
+                            fontSize: "16px",
+                            color: "#b8860b",
+                          }}
+                        >
+                          Quran:
+                        </span>
+                        <p
+                          style={{
+                            ...styles.scoreFormInput,
+                            paddingLeft: "60px",
+                          }}
+                          className="score-form-input"
+                        >
+                          {scoreFormData.QuoranP}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="col-12 col-md-4 mb-3">
+                      <div style={styles.scoreFormInputWrapper}>
+                        <span
+                          style={{
+                            ...styles.scoreFormInputIcon,
+                            fontSize: "16px",
+                            color: "#b8860b",
+                          }}
+                        >
+                          Prayer:
+                        </span>
+                        <p
+                          style={{
+                            ...styles.scoreFormInput,
+                            paddingLeft: "70px",
+                          }}
+                          className="score-form-input"
+                        >
+                          {scoreFormData.PrayerP}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="col-12 col-md-4 mb-3">
+                      <div style={styles.scoreFormInputWrapper}>
+                        <span
+                          style={{
+                            ...styles.scoreFormInputIcon,
+                            fontSize: "16px",
+                            color: "#b8860b",
+                          }}
+                        >
+                          Sport:
+                        </span>
+                        <p
+                          style={{
+                            ...styles.scoreFormInput,
+                            paddingLeft: "60px",
+                          }}
+                          className="score-form-input"
+                        >
+                          {scoreFormData.SportP}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="col-12 col-md-4 mb-3">
+                      <div style={styles.scoreFormInputWrapper}>
+                        <span
+                          style={{
+                            ...styles.scoreFormInputIcon,
+                            fontSize: "16px",
+                            color: "#b8860b",
+                          }}
+                        >
+                          Quran Listen:
+                        </span>
+                        <p
+                          style={{
+                            ...styles.scoreFormInput,
+                            paddingLeft: "110px",
+                          }}
+                          className="score-form-input"
+                        >
+                          {scoreFormData.QuranListenP}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="col-12 col-md-4 mb-3">
+                      <div style={styles.scoreFormInputWrapper}>
+                        <span
+                          style={{
+                            ...styles.scoreFormInputIcon,
+                            fontSize: "16px",
+                            color: "#b8860b",
+                          }}
+                        >
+                          Improvement:
+                        </span>
+                        <p
+                          style={{
+                            ...styles.scoreFormInput,
+                            paddingLeft: "110px",
+                          }}
+                          className="score-form-input"
+                        >
+                          {scoreFormData.Improvement15minP}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="col-12 col-md-4 mb-3">
+                      <div style={styles.scoreFormInputWrapper}>
+                        <span
+                          style={{
+                            ...styles.scoreFormInputIcon,
+                            fontSize: "16px",
+                            color: "#b8860b",
+                          }}
+                        >
+                          Wake Up:
+                        </span>
+                        <p
+                          style={{
+                            ...styles.scoreFormInput,
+                            paddingLeft: "80px",
+                          }}
+                          className="score-form-input"
+                        >
+                          {scoreFormData.WakeUpEarlyP}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div style={styles.scoreFormInputWrapper}>
-                    <i
-                      className="bi bi-person-fill"
-                      style={styles.scoreFormInputIcon}
-                    ></i>
-                    <input
-                      placeholder="Your Nickname"
-                      name="Nickname"
-                      type="text"
-                      value={scoreFormData.nickname}
-                      onChange={(e) =>
-                        handleFieldUpdate("nickname", e.target.value)
-                      }
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    />
-                  </div>
-                  <div style={styles.scoreFormInputWrapper}>
-                    <i
-                      className="bi bi-star-fill"
-                      style={styles.scoreFormInputIcon}
-                    ></i>
-                    <input
-                      placeholder="Your Score"
-                      name="Score"
-                      type="text"
-                      value={scoreFormData.score}
-                      onChange={(e) =>
-                        handleFieldUpdate("score", e.target.value)
-                      }
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    />
-                  </div>
-                  <div style={styles.scoreFormInputWrapper}>
-                    <i
-                      className="bi bi-chat-fill"
-                      style={styles.scoreFormInputIcon}
-                    ></i>
-                    <input
-                      placeholder="Message to the Admin"
-                      name="Message"
-                      type="text"
-                      value={scoreFormData.message}
-                      onChange={(e) =>
-                        handleFieldUpdate("message", e.target.value)
-                      }
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    />
-                  </div>
-                  <input
-                    name="Name"
-                    type="submit"
-                    style={styles.scoreFormSubmit}
-                    value="Submit Weekly Score"
-                    className="score-form-submit"
-                    hidden
-                  />
-                </form>
+                </div>
               </div>
             </div>
           </div>
           <div className="col-12 col-md-6 mb-3">
             <div style={styles.scoreFormCard} className="card shadow-sm">
               <div style={styles.cardBody} className="p-3">
-                <h3 style={styles.scoreFormTitle}>Monthly Score</h3>
-                <form className="form" onSubmit={SubmitMonthly}>
-                  <div style={styles.scoreFormInputWrapper}>
-                    <i
-                      className="bi bi-clock-fill"
-                      style={styles.scoreFormInputIcon}
-                    ></i>
-                    <input
-                      placeholder="Time of Submission"
-                      name="Timing"
-                      type="text"
-                      value={monthlyScoreFormData.timestamp}
-                      readOnly
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    />
-                  </div>
-                  <div style={styles.scoreFormInputWrapper}>
-                    <i
-                      className="bi bi-person-fill"
-                      style={styles.scoreFormInputIcon}
-                    ></i>
-                    <input
-                      placeholder="Your Nickname"
-                      name="Name"
-                      type="text"
-                      value={monthlyScoreFormData.nickname}
-                      onChange={(e) =>
-                        handleFieldMonthlyUpdate("nickname", e.target.value)
-                      }
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    />
-                  </div>
-                  <div style={styles.scoreFormInputWrapper}>
-                    <i
-                      className="bi bi-trophy-fill"
-                      style={styles.scoreFormInputIcon}
-                    ></i>
-                    <input
-                      placeholder="Your Score"
-                      name="Mscore"
-                      type="text"
-                      value={monthlyScoreFormData.score}
-                      onChange={(e) =>
-                        handleFieldMonthlyUpdate("score", e.target.value)
-                      }
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    />
-                  </div>
-                  <div style={styles.scoreFormInputWrapper}>
-                    <i
-                      className="bi bi-chat-fill"
-                      style={styles.scoreFormInputIcon}
-                    ></i>
-                    <input
-                      placeholder="Message to the Admin"
-                      name="Mess"
-                      type="text"
-                      value={monthlyScoreFormData.message}
-                      onChange={(e) =>
-                        handleFieldMonthlyUpdate("message", e.target.value)
-                      }
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    />
-                  </div>
+                <h3 style={styles.scoreFormTitle}>Achievements</h3>
+                <div>
                   <div style={styles.scoreFormInputWrapper}>
                     <i
                       className="bi bi-star-fill"
                       style={{ ...styles.scoreFormInputIcon, color: "#cd7f32" }}
                     ></i>
-                    <input
-                      placeholder="Bronze Achievements"
-                      name="Bronze"
-                      type="number"
-                      value={monthlyScoreFormData.bronze}
-                      onChange={(e) =>
-                        handleFieldMonthlyUpdate("bronze", e.target.value)
-                      }
+                    <p
                       style={styles.scoreFormInput}
                       className="score-form-input"
-                      readOnly
-                    />
+                    >
+                      {monthlyScoreFormData.bronze}
+                    </p>
                   </div>
                   <div style={styles.scoreFormInputWrapper}>
                     <i
-                      className="bi excepción-star-fill"
+                      className="bi bi-star-fill"
                       style={{ ...styles.scoreFormInputIcon, color: "#c0c0c0" }}
                     ></i>
-                    <input
-                      placeholder="Silver Achievements"
-                      name="Silver"
-                      type="number"
-                      value={monthlyScoreFormData.silver}
+                    <p
                       style={styles.scoreFormInput}
                       className="score-form-input"
-                      readOnly
-                    />
+                    >
+                      {monthlyScoreFormData.silver}
+                    </p>
                   </div>
                   <div style={styles.scoreFormInputWrapper}>
                     <i
                       className="bi bi-star-fill"
                       style={{ ...styles.scoreFormInputIcon, color: "#ffd700" }}
                     ></i>
-                    <input
-                      placeholder="Gold Achievements"
-                      name="Gold"
-                      type="number"
-                      value={monthlyScoreFormData.gold}
+                    <p
                       style={styles.scoreFormInput}
                       className="score-form-input"
-                      readOnly
-                    />
+                    >
+                      {monthlyScoreFormData.gold}
+                    </p>
                   </div>
-                  <input
-                    name="Submit"
-                    type="submit"
-                    hidden
-                    style={styles.scoreFormSubmit}
-                    value="Submit Monthly Score"
-                    className="score-form-submit"
-                  />
-                </form>
+                </div>
               </div>
             </div>
           </div>

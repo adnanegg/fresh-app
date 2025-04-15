@@ -40,113 +40,186 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     isAchievementsOpen,
     toggleAchievements,
     refreshGlobalTasks: refreshGlobalTasksFromLogic,
-  } = useNormalModeLogic(globalTasks, refreshGlobalTasks);
+    switchMode,
+    adjustMonthlyPoints,
+    adjustPoints,
+  } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "daily");
 
   const [openAchievementSections, setOpenAchievementSections] = useState({});
-  const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = useState(false); // New state for toggling weekly tasks
+  const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = useState(false);
+
+  const handleSwitchToWeekly = () => {
+    Swal.fire({
+      title: "Switching to Weekly Tracker",
+      text: "You’re about to switch to Weekly Mode. In this mode, you can track your tasks over the entire week without daily limits. Focus will be on weekly goals and total completions.",
+      icon: "info",
+      confirmButtonText: "OK",
+      confirmButtonColor: "#17a2b8",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        switchMode("weekly");
+      }
+    });
+  };
 
   const styles = {
-    containerFluid: { padding: 0, minHeight: "100vh" },
+    containerFluid: {
+      padding: 0,
+      minHeight: "100vh",
+      overflowX: "hidden",
+      position: "relative",
+    },
+    videoBackground: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      zIndex: -1,
+    },
+    videoOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      backgroundColor: "rgba(0, 0, 0, 0.02)",
+      zIndex: 0,
+    },
     dashboardContent: {
-      marginTop: "60px",
-      padding: "10px",
+      marginTop: "50px",
+      padding: "8px",
       flex: 1,
       zIndex: 10,
     },
     dashboardCard: {
-      borderRadius: "8px",
-      background: "none",
-      boxShadow: "none",
+      borderRadius: "6px",
+      background: "transparent",
+      border: "1px solid rgba(255, 255, 255, 0.3)",
+      boxShadow: "0 0 5px rgba(255, 255, 255, 0.5)",
     },
-    cardBody: { padding: "10px" },
-    cardTitle: { fontSize: "12px", fontWeight: 600 },
+    cardBody: { padding: "8px" },
+    cardTitle: { fontSize: "11px", fontWeight: 600, color: "white" },
     listGroupItem: {
       backgroundColor: "transparent",
       border: "none",
-      fontSize: "14px",
+      fontSize: "12px",
+      color: "white",
     },
     penaltyListGroupItem: {
       backgroundColor: "rgba(139, 0, 0, 0.1)",
       border: "1px solid #8b0000",
       color: "#ff4040",
       fontWeight: "bold",
-      padding: "6px",
-      borderRadius: "4px",
-      fontSize: "14px",
+      padding: "4px",
+      borderRadius: "3px",
+      fontSize: "12px",
     },
     formSelectSm: {
-      fontSize: "10px",
+      fontSize: "9px",
       padding: "2px 4px",
-      borderRadius: "4px",
-      width: "100px",
+      borderRadius: "3px",
+      width: "90px",
+      height: "30px",
     },
     taskNotification: {
       position: "absolute",
-      top: "-15px",
+      top: "-12px",
       right: "0",
-      fontSize: "10px",
+      fontSize: "9px",
       color: "#28a745",
       fontWeight: "bold",
       animation: "popUp 3s ease-out forwards",
     },
     pointsProgress: {
       textAlign: "center",
-      padding: "10px",
-      borderRadius: "8px",
+      padding: "8px",
+      borderRadius: "6px",
       background: "linear-gradient(135deg, #ff6b6b, #007bff)",
-      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
     },
     monthlyPointsProgress: {
       textAlign: "center",
-      padding: "10px",
-      borderRadius: "8px",
+      padding: "8px",
+      borderRadius: "6px",
       background: "linear-gradient(135deg, #ff6b6b, #ffc107)",
-      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
     },
-    progressText: { fontSize: "18px", fontWeight: "bold", color: "white" },
+    progressText: { fontSize: "16px", fontWeight: "bold", color: "white" },
     progressIcon: {
-      fontSize: "20px",
-      marginBottom: "5px",
+      fontSize: "18px",
+      marginBottom: "4px",
       animation: "pulse 2s infinite ease-in-out",
     },
     timesInput: {
-      width: "60px",
-      padding: "4px",
-      fontSize: "12px",
-      borderRadius: "4px",
-      marginLeft: "5px",
+      width: "50px",
+      padding: "3px",
+      fontSize: "11px",
+      borderRadius: "3px",
+      marginLeft: "4px",
+      height: "30px",
     },
     startWeekButton: {
-      margin: "5px",
-      padding: "8px 16px",
-      backgroundColor: "#28a745",
+      margin: "4px",
+      padding: "6px 12px",
+      width: "120px",
+      background: "linear-gradient(135deg, #28a745, #1e7e34)",
       color: "white",
       border: "none",
-      borderRadius: "4px",
-      fontSize: "12px",
+      borderRadius: "3px",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "transform 0.2s, background 0.2s",
     },
     startDayButton: {
-      margin: "5px",
-      padding: "8px 16px",
-      backgroundColor: "#007bff",
+      margin: "4px",
+      padding: "6px 12px",
+      width: "120px",
+      background: "linear-gradient(135deg, #007bff, #0056b3)",
       color: "white",
       border: "none",
-      borderRadius: "4px",
-      fontSize: "12px",
+      borderRadius: "3px",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "transform 0.2s, background 0.2s",
+    },
+    switchButton: {
+      margin: "4px",
+      padding: "6px 12px",
+      background: "linear-gradient(135deg, #17a2b8, #117a8b)",
+      color: "white",
+      border: "none",
+      borderRadius: "3px",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "transform 0.2s, background 0.2s",
     },
     normalmodenav: {
       position: "fixed",
       top: 0,
       width: "100%",
       background: "#ffc107",
-      padding: "0.5rem 1rem",
+      padding: "0.4rem 0.8rem",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       zIndex: 1000,
     },
     profileSection: {
-      padding: "5px 0",
+      padding: "4px 0",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -156,12 +229,13 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       top: "50%",
       left: "50%",
       transform: "translate(-50%, -50%)",
-      width: "90%",
-      maxHeight: "80vh",
-      background: "white",
-      padding: "15px",
-      borderRadius: "8px",
-      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+      width: "95%",
+      maxHeight: "85vh",
+      background: "transparent",
+      padding: "12px",
+      borderRadius: "6px",
+      border: "1px solid rgba(255, 255, 255, 0.3)",
+      boxShadow: "0 0 5px rgba(255, 255, 255, 0.5)",
       zIndex: 2000,
       overflowY: "auto",
     },
@@ -179,24 +253,23 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       flexDirection: "column",
       width: "100%",
     },
-    achievementSection: { margin: "5px 0" },
+    achievementSection: { margin: "4px 0" },
   };
 
   const stylesString = `
-    @keyframes popUp {
-      0% { opacity: 0; transform: translateY(-10px); }
-      50% { opacity: 1; transform: translateY(0); }
-      100% { opacity: 0; transform: translateY(-10px); }
+    @keyframes popUp { 0% { opacity: 0; transform: translateY(-10px); } 50% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-10px); } }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    .switch-button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #117a8b, #0d5f6e);
     }
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-      100% { transform: scale(1); }
+    .start-day-button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #0056b3, #003d80);
     }
-    @media (orientation: portrait) {
-      .mobile-column {
-        flex-direction: column-reverse;
-      }
+    .start-week-button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #1e7e34, #155927);
     }
   `;
 
@@ -211,15 +284,20 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
 
   return (
     <div style={styles.containerFluid}>
+      <video autoPlay loop muted style={styles.videoBackground}>
+        <source src="/videos/backvideo2.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+      <div style={styles.videoOverlay}></div>
       <style>{stylesString}</style>
       <nav style={styles.normalmodenav}>
         <div className="nav-brand">
-          <img src="/trackerLogo.png" alt="Logo" style={{ width: "30px" }} />
-          <span className="nav-title" style={{ fontSize: "14px" }}>
+          <img src="/trackerLogo.png" alt="Logo" style={{ width: "25px" }} />
+          <span className="nav-title" style={{ fontSize: "12px" }}>
             Program
           </span>
         </div>
-        <div className="nav-links" style={{ fontSize: "12px" }}>
+        <div className="nav-links" style={{ fontSize: "11px" }}>
           <Link to="/dashboard" className="nav-link">
             <i className="bi bi-house-fill"></i>
           </Link>
@@ -227,7 +305,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
             <i className="bi bi-star-fill"></i>
           </Link>
           <Link to="/gamepage" className="nav-link">
-            <i className="bi bi-dice-6-fill"></i> Game
+            <i className="bi bi-dice-6-fill"></i>
           </Link>
           <Link to="/statistics" className="nav-link">
             <i className="bi bi-bar-chart-fill"></i>
@@ -236,9 +314,18 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
             <i className="bi bi-trophy-fill"></i>
           </button>
           <button
+            onClick={handleSwitchToWeekly}
+            style={styles.switchButton}
+            className="nav-link switch-button"
+            title="Switch to Weekly Mode"
+          >
+            <i className="bi bi-arrow-repeat me-1"></i>
+            Weekly
+          </button>
+          <button
             onClick={handleLogout}
             className="nav-logout"
-            style={{ padding: "2px 5px" }}
+            style={{ padding: "2px 4px", minWidth: "44px", minHeight: "44px" }}
           >
             <i className="bi bi-box-arrow-right"></i>
           </button>
@@ -246,38 +333,39 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       </nav>
       <div style={styles.dashboardContent}>
         {isLoading ? (
-          <div className="text-center py-5">
+          <div className="text-center py-4">
             <div
               className="spinner-border text-primary"
               role="status"
-              style={{ width: "2rem", height: "2rem" }}
+              style={{ width: "1.5rem", height: "1.5rem" }}
             >
               <span className="visually-hidden">Loading...</span>
             </div>
-            <p className="mt-2" style={{ fontSize: "14px" }}>
+            <p className="mt-2" style={{ fontSize: "12px", color: "white" }}>
               Loading tasks...
             </p>
           </div>
         ) : (
           <>
-            <div className="row mb-3" style={styles.profileSection}>
-              <div className="col-12">
-                <div style={styles.dashboardCard} className="card shadow-sm">
+            {/* Profile, Points, and Monthly Points in One Row */}
+            <div className="row mb-2">
+              <div className="col-12 mb-2">
+                <div style={styles.dashboardCard} className="card">
                   <div style={styles.cardBody} className="text-center p-2">
                     <h4
-                      style={{ ...styles.cardTitle, fontSize: "16px" }}
+                      style={{ ...styles.cardTitle, fontSize: "14px" }}
                       className="text-dark fw-bold mb-1"
                     >
                       {userData.profile.name}
                     </h4>
-                    <p className="text-muted" style={{ fontSize: "10px" }}>
+                    <p className="text-muted" style={{ fontSize: "9px" }}>
                       User ID: {auth.currentUser?.uid?.slice(0, 8)}...
                     </p>
                     <div className="mt-1">
                       <span className="me-2">
                         <i
                           className="bi bi-star-fill"
-                          style={{ color: "#cd7f32", fontSize: "14px" }}
+                          style={{ color: "#cd7f32", fontSize: "12px" }}
                         ></i>{" "}
                         {
                           Object.values(userData.achievements).filter(
@@ -288,7 +376,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       <span className="me-2">
                         <i
                           className="bi bi-star-fill"
-                          style={{ color: "#c0c0c0", fontSize: "14px" }}
+                          style={{ color: "#c0c0c0", fontSize: "12px" }}
                         ></i>{" "}
                         {
                           Object.values(userData.achievements).filter(
@@ -299,7 +387,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       <span>
                         <i
                           className="bi bi-star-fill"
-                          style={{ color: "#ffd700", fontSize: "14px" }}
+                          style={{ color: "#ffd700", fontSize: "12px" }}
                         ></i>{" "}
                         {
                           Object.values(userData.achievements).filter(
@@ -311,10 +399,8 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                   </div>
                 </div>
               </div>
-            </div>
-            <div className="row mb-3">
-              <div className="col-6">
-                <div style={styles.dashboardCard} className="card shadow-sm">
+              <div className="col-12 mb-2">
+                <div style={styles.dashboardCard} className="card">
                   <div style={styles.cardBody} className="p-2 text-center">
                     <h6 style={styles.cardTitle}>Points</h6>
                     <div style={styles.pointsProgress}>
@@ -331,10 +417,26 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       <p style={styles.progressText}>
                         {userData.points.current}/{userData.points.total}
                       </p>
+                      <div className="d-flex justify-content-center gap-2 mt-1">
+                        <button
+                          onClick={() => adjustPoints(5)}
+                          className="btn btn-success btn-sm"
+                          style={{ fontSize: "9px", minHeight: "30px" }}
+                        >
+                          +5pts
+                        </button>
+                        <button
+                          onClick={() => adjustPoints(-5)}
+                          className="btn btn-danger btn-sm"
+                          style={{ fontSize: "9px", minHeight: "30px" }}
+                        >
+                          −5pts
+                        </button>
+                      </div>
                       <button
                         onClick={resetPointsBar}
                         className="btn btn-warning btn-sm w-100 mt-1"
-                        style={{ fontSize: "10px" }}
+                        style={{ fontSize: "9px", minHeight: "30px" }}
                       >
                         Reset
                       </button>
@@ -342,8 +444,8 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                   </div>
                 </div>
               </div>
-              <div className="col-6">
-                <div style={styles.dashboardCard} className="card shadow-sm">
+              <div className="col-12 mb-2">
+                <div style={styles.dashboardCard} className="card">
                   <div style={styles.cardBody} className="p-2 text-center">
                     <h6 style={styles.cardTitle}>Monthly</h6>
                     <div style={styles.monthlyPointsProgress}>
@@ -360,10 +462,26 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       <p style={styles.progressText}>
                         {userData.Mpoints.current}/{userData.Mpoints.total}
                       </p>
+                      <div className="d-flex justify-content-center gap-2 mt-1">
+                        <button
+                          onClick={() => adjustMonthlyPoints(5)}
+                          className="btn btn-success btn-sm"
+                          style={{ fontSize: "9px", minHeight: "30px" }}
+                        >
+                          +5pts
+                        </button>
+                        <button
+                          onClick={() => adjustMonthlyPoints(-5)}
+                          className="btn btn-danger btn-sm"
+                          style={{ fontSize: "9px", minHeight: "30px" }}
+                        >
+                          −5pts
+                        </button>
+                      </div>
                       <button
                         onClick={resetMonthlyPointsBar}
                         className="btn btn-warning btn-sm w-100 mt-1"
-                        style={{ fontSize: "10px" }}
+                        style={{ fontSize: "9px", minHeight: "30px" }}
                       >
                         Reset
                       </button>
@@ -372,19 +490,27 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                 </div>
               </div>
             </div>
-            <div className="row mb-3">
+
+            {/* Apply Boost Section */}
+            <div className="row mb-2">
               <div className="col-12">
-                <div style={styles.dashboardCard} className="card shadow-sm">
+                <div style={styles.dashboardCard} className="card">
                   <div className="p-2">
-                    <h6 style={{ fontSize: "12px", fontWeight: "bold" }}>
+                    <h6
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: "bold",
+                        color: "white",
+                      }}
+                    >
                       Apply Boost
                     </h6>
-                    <div className="d-flex flex-column">
+                    <div className="d-flex align-items-center flex-wrap">
                       <select
                         value={selectedTaskIndex}
                         onChange={(e) => setSelectedTaskIndex(e.target.value)}
-                        className="mb-2"
-                        style={{ fontSize: "12px" }}
+                        className="mb-2 me-2"
+                        style={{ fontSize: "11px", height: "30px" }}
                       >
                         <option value="">Select Task</option>
                         {userData.tasks.map((task, index) => (
@@ -396,8 +522,8 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       <select
                         value={selectedBoost}
                         onChange={(e) => setSelectedBoost(e.target.value)}
-                        className="mb-2"
-                        style={{ fontSize: "12px" }}
+                        className="mb-2 me-2"
+                        style={{ fontSize: "11px", height: "30px" }}
                       >
                         <option value="">Select Boost</option>
                         {Object.entries({
@@ -416,8 +542,8 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       </select>
                       <button
                         onClick={applyBoost}
-                        className="btn btn-primary btn-sm"
-                        style={{ fontSize: "12px" }}
+                        className="btn btn-primary btn-sm mb-2"
+                        style={{ fontSize: "11px", minHeight: "30px" }}
                       >
                         Apply
                       </button>
@@ -426,54 +552,70 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                 </div>
               </div>
             </div>
-            <div className="row mb-3 justify-content-center">
-              <button
-                onClick={startTheWeek}
-                style={styles.startWeekButton}
-                className="btn"
-              >
-                Start Week
-              </button>
-              <button
-                onClick={startTheDay}
-                style={styles.startDayButton}
-                className="btn"
-              >
-                Start Day
-              </button>
-              <button
-                onClick={refreshGlobalTasksFromLogic}
-                style={{
-                  margin: "5px",
-                  padding: "8px 16px",
-                  backgroundColor: "#ffc107",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-                className="btn"
-              >
-                Refresh Tasks
-              </button>
+
+            {/* Start Buttons */}
+            <div className="row mb-2">
+              <div className="d-flex justify-content-between flex-wrap">
+                <button
+                  onClick={startTheDay}
+                  style={styles.startDayButton}
+                  className="btn start-day-button"
+                >
+                  <i className="bi bi-sunrise me-1"></i>
+                  Start Today
+                </button>
+                <button
+                  onClick={startTheWeek}
+                  style={styles.startWeekButton}
+                  className="btn start-week-button"
+                >
+                  <i className="bi bi-calendar-week me-1"></i>
+                  Start Week
+                </button>
+                <button
+                  onClick={refreshGlobalTasksFromLogic}
+                  style={{
+                    ...styles.startWeekButton,
+                    background: "linear-gradient(135deg, #ffc107, #e0a800)",
+                  }}
+                  className="btn"
+                >
+                  <i className="bi bi-arrow-clockwise me-1"></i>
+                  Refresh Tasks
+                </button>
+              </div>
             </div>
+
+            {/* Daily Tasks and Completed Tasks */}
             <div className="row mobile-column">
-              <div className="col-12 mb-3">
-                <div style={styles.dashboardCard} className="card shadow-sm">
+              <div className="col-12 mb-2">
+                <div style={styles.dashboardCard} className="card">
                   <div style={styles.cardBody}>
                     <h6 style={styles.cardTitle}>Daily Tasks</h6>
                     <div className="accordion">
                       {Object.entries(groupedTasks).map(
                         ([category, categoryTasks]) => (
-                          <div className="accordion-item" key={category}>
+                          <div
+                            className="accordion-item"
+                            key={category}
+                            style={{
+                              background: "transparent",
+                              border: "1px solid rgba(255, 255, 255, 0.3)",
+                              boxShadow: "0 0 5px rgba(255, 255, 255, 0.5)",
+                            }}
+                          >
                             <h2 className="accordion-header">
                               <button
                                 className={`accordion-button ${
                                   !openSections[category] ? "collapsed" : ""
-                                } text-dark`}
+                                }`}
                                 onClick={() => toggleSection(category)}
                                 aria-expanded={openSections[category]}
-                                style={{ fontSize: "12px" }}
+                                style={{
+                                  fontSize: "11px",
+                                  background: "transparent",
+                                  color: "white",
+                                }}
                               >
                                 {category} ({categoryTasks.length})
                               </button>
@@ -507,7 +649,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                             {task.boost && (
                                               <span
                                                 className="badge bg-primary ms-1"
-                                                style={{ fontSize: "10px" }}
+                                                style={{ fontSize: "9px" }}
                                               >
                                                 {task.boost}
                                               </span>
@@ -563,7 +705,10 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                               }
                                               className="btn btn-success btn-sm me-1 mb-1"
                                               disabled={isCompleteDisabled}
-                                              style={{ fontSize: "10px" }}
+                                              style={{
+                                                fontSize: "9px",
+                                                minHeight: "30px",
+                                              }}
                                             >
                                               Complete
                                             </button>
@@ -574,7 +719,11 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                                 )
                                               }
                                               className="btn btn-warning btn-sm me-1 mb-1"
-                                              style={{ fontSize: "10px" }}
+                                              style={{
+                                                fontSize: "9px",
+                                                minHeight: "30px",
+                                              }}
+                                              disabled={isCompleteDisabled}
                                             >
                                               Reset
                                             </button>
@@ -584,7 +733,10 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                                   removeBoost(originalIndex)
                                                 }
                                                 className="btn btn-danger btn-sm mb-1"
-                                                style={{ fontSize: "10px" }}
+                                                style={{
+                                                  fontSize: "9px",
+                                                  minHeight: "30px",
+                                                }}
                                               >
                                                 Remove
                                               </button>
@@ -592,7 +744,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                           </div>
                                           <small
                                             className="text-muted"
-                                            style={{ fontSize: "10px" }}
+                                            style={{ fontSize: "9px" }}
                                           >
                                             ({task.points} Pts
                                             {task.penaltyPoints || task.penalty
@@ -635,7 +787,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 ) : (
                                   <p
                                     className="text-muted small"
-                                    style={{ fontSize: "12px" }}
+                                    style={{ fontSize: "11px", color: "white" }}
                                   >
                                     No tasks in this category
                                   </p>
@@ -649,8 +801,8 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                   </div>
                 </div>
               </div>
-              <div className="col-12 mb-3">
-                <div style={styles.dashboardCard} className="card shadow-sm">
+              <div className="col-12 mb-2">
+                <div style={styles.dashboardCard} className="card">
                   <div style={styles.cardBody}>
                     <h6 style={styles.cardTitle}>Daily Completed Tasks</h6>
                     {userData.completedTasks.length > 0 ? (
@@ -671,7 +823,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 <button
                                   onClick={() => undoTask(index)}
                                   className="btn btn-danger btn-sm"
-                                  style={{ fontSize: "10px" }}
+                                  style={{ fontSize: "9px", minHeight: "30px" }}
                                 >
                                   Undo
                                 </button>
@@ -694,7 +846,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 <button
                                   onClick={() => undoTask(index)}
                                   className="btn btn-danger btn-sm"
-                                  style={{ fontSize: "10px" }}
+                                  style={{ fontSize: "9px", minHeight: "30px" }}
                                 >
                                   Undo
                                 </button>
@@ -705,7 +857,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                     ) : (
                       <p
                         className="text-muted text-center small"
-                        style={{ fontSize: "12px" }}
+                        style={{ fontSize: "11px", color: "white" }}
                       >
                         No completed tasks today.
                       </p>
@@ -713,8 +865,8 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                   </div>
                 </div>
               </div>
-              <div className="col-12 mb-3">
-                <div style={styles.dashboardCard} className="card shadow-sm">
+              <div className="col-12 mb-2">
+                <div style={styles.dashboardCard} className="card">
                   <div style={styles.cardBody}>
                     <div className="d-flex justify-content-between align-items-center">
                       <h6 style={styles.cardTitle}>
@@ -723,7 +875,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       <button
                         onClick={() => setIsWeeklyTasksOpen(!isWeeklyTasksOpen)}
                         className="btn btn-sm btn-outline-primary"
-                        style={{ fontSize: "10px" }}
+                        style={{ fontSize: "9px", minHeight: "30px" }}
                       >
                         {isWeeklyTasksOpen ? "Hide" : "Show"}
                       </button>
@@ -745,7 +897,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 <button
                                   onClick={() => undoTask(index)}
                                   className="btn btn-danger btn-sm"
-                                  style={{ fontSize: "10px" }}
+                                  style={{ fontSize: "9px", minHeight: "30px" }}
                                 >
                                   Undo
                                 </button>
@@ -768,7 +920,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 <button
                                   onClick={() => undoTask(index)}
                                   className="btn btn-danger btn-sm"
-                                  style={{ fontSize: "10px" }}
+                                  style={{ fontSize: "9px", minHeight: "30px" }}
                                 >
                                   Undo
                                 </button>
@@ -779,7 +931,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       ) : (
                         <p
                           className="text-muted text-center small"
-                          style={{ fontSize: "12px" }}
+                          style={{ fontSize: "11px", color: "white" }}
                         >
                           No completed tasks this week.
                         </p>
@@ -796,11 +948,11 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
         <>
           <div style={styles.overlay} onClick={toggleAchievements}></div>
           <div style={styles.achievementsModal}>
-            <h5 style={{ fontSize: "14px" }}>Achievements</h5>
+            <h5 style={{ fontSize: "12px", color: "white" }}>Achievements</h5>
             <button
               onClick={toggleAchievements}
               className="btn btn-danger btn-sm float-end"
-              style={{ fontSize: "10px" }}
+              style={{ fontSize: "9px", minHeight: "30px" }}
             >
               Close
             </button>
@@ -820,8 +972,8 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                         onClick={() => toggleAchievementSection(category)}
                         style={{
                           textDecoration: "none",
-                          color: "#000",
-                          fontSize: "12px",
+                          color: "white",
+                          fontSize: "11px",
                         }}
                       >
                         {category} ({achievements.length})
@@ -849,19 +1001,26 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                             <li
                               key={achievement.name}
                               className="list-group-item d-flex justify-content-between align-items-center"
-                              style={{ fontSize: "12px" }}
+                              style={{
+                                fontSize: "11px",
+                                background: "transparent",
+                                border: "none",
+                                color: "white",
+                              }}
                             >
                               <div>
                                 <span
                                   style={{
                                     fontWeight: isEarned ? "bold" : "normal",
-                                    color: isEarned ? "#28a745" : "#000",
+                                    color: isEarned ? "#28a745" : "white",
                                   }}
                                 >
                                   {achievement.name} - {achievement.description}
                                 </span>
                                 <br />
-                                <small style={{ fontSize: "10px" }}>
+                                <small
+                                  style={{ fontSize: "9px", color: "white" }}
+                                >
                                   Progress: {progress}/{achievement.target}{" "}
                                   {isEarned
                                     ? `(Earned: ${new Date(
@@ -874,7 +1033,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                               </div>
                               <i
                                 className="bi bi-star-fill"
-                                style={{ color: starColor, fontSize: "14px" }}
+                                style={{ color: starColor, fontSize: "12px" }}
                               ></i>
                             </li>
                           );
