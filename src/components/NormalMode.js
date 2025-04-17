@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { auth } from "../firebase";
 import { useNormalModeLogic } from "./NormalModeLogic";
@@ -12,8 +12,10 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
   const {
     userData,
     notifications,
+    setNotifications,
     openSections,
     isLoading,
+    isSyncing,
     selectedTaskIndex,
     setSelectedTaskIndex,
     selectedBoost,
@@ -43,11 +45,61 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     adjustPoints,
     adjustMonthlyPoints,
     switchMode,
+    syncWithFirebase,
+    normalTutorialMessages,
+    applyGlobalBoost,
+    startWeekForAllUsers,
+    sendGlobalNotification,
+    submitFeedback,
+    viewFeedback,
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "weekly");
 
   const [openAchievementSections, setOpenAchievementSections] = React.useState(
     {}
   );
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [dontShowTutorial, setDontShowTutorial] = useState(false);
+  const [adminSelectedTaskId, setAdminSelectedTaskId] = useState("");
+  const [adminSelectedBoost, setAdminSelectedBoost] = useState("");
+  const [dismissedNotifications, setDismissedNotifications] = useState(() => {
+    return (
+      JSON.parse(
+        localStorage.getItem(`dismissedNotifications_${auth.currentUser?.uid}`)
+      ) || []
+    );
+  });
+
+  const contentHash = JSON.stringify(normalTutorialMessages);
+
+  useEffect(() => {
+    const storedHash = localStorage.getItem("tutorialContentHash");
+    const storedDontShow = localStorage.getItem("dontShowTutorial") === "true";
+    if (storedHash !== contentHash) {
+      localStorage.setItem("tutorialContentHash", contentHash);
+      localStorage.removeItem("dontShowTutorial");
+      setShowTutorial(true);
+    } else if (!storedDontShow) {
+      setShowTutorial(true);
+    }
+    setDontShowTutorial(storedDontShow);
+  }, [contentHash]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      `dismissedNotifications_${auth.currentUser?.uid}`,
+      JSON.stringify(dismissedNotifications)
+    );
+  }, [dismissedNotifications]);
+
+  const handleDontShowChange = (e) => {
+    const checked = e.target.checked;
+    setDontShowTutorial(checked);
+    localStorage.setItem("dontShowTutorial", checked);
+  };
+
+  const dismissNotification = (notificationId) => {
+    setDismissedNotifications((prev) => [...prev, notificationId]);
+  };
 
   const showTaskDescription = (taskId) => {
     const task = globalTasks[taskId];
@@ -61,6 +113,31 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       }\nWeekly Goal: ${task.numberLimit} times`,
       icon: "info",
     });
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      syncWithFirebase(true);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [syncWithFirebase]);
+
+  const handleSaveProgress = async () => {
+    try {
+      await syncWithFirebase(true);
+      Swal.fire({
+        icon: "success",
+        title: "Progress Saved!",
+        text: "Your progress has been synced to the server.",
+        timer: 1500,
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: "Failed to save progress. Your changes are saved locally.",
+      });
+    }
   };
 
   const styles = {
@@ -111,7 +188,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       background: "linear-gradient(135deg, #ff6b6b, #ffc107)",
       boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
     },
-    progressText: { fontSize: "24px", fontWeight: "bold", color: "white" },
+    progressText: { fontSize: "24px", fontWeight: "bold", color: "black" },
     progressIcon: {
       fontSize: "30px",
       marginBottom: "10px",
@@ -141,6 +218,19 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       fontSize: "16px",
       borderRadius: "6px",
       marginLeft: "10px",
+    },
+    saveProgressButton: {
+      margin: "10px",
+      padding: "8px 16px",
+      backgroundColor: "#007bff",
+      color: "white",
+      border: "none",
+      borderRadius: "6px",
+      transition: "background-color 0.2s",
+    },
+    saveProgressButtonSaving: {
+      backgroundColor: "#0056b3",
+      animation: "pulse 1.5s infinite ease-in-out",
     },
     startWeekButton: {
       margin: "10px",
@@ -205,7 +295,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       transform: "translate(-50%, -50%)",
       width: "90%",
       maxHeight: "80vh",
-      background: "white",
+      background: "black",
       padding: "20px",
       borderRadius: "8px",
       boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
@@ -228,23 +318,141 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       width: "100%",
     },
     achievementSection: { flex: 1, margin: "0 10px" },
+    tutorialModal: {
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      width: "80%",
+      maxWidth: "500px",
+      background: "linear-gradient(135deg, #007bff, #28a745)",
+      color: "white",
+      padding: "20px",
+      borderRadius: "12px",
+      boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
+      zIndex: 2002,
+      fontFamily: "'Arial', sans-serif",
+    },
+    tutorialOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      background: "rgba(0, 0, 0, 0.6)",
+      zIndex: 2001,
+    },
+    tutorialContent: {
+      fontSize: "16px",
+      lineHeight: "1.6",
+      marginBottom: "20px",
+    },
+    tutorialCheckbox: {
+      marginRight: "10px",
+    },
+    tutorialButton: {
+      backgroundColor: "#ffc107",
+      color: "#000",
+      padding: "8px 16px",
+      border: "none",
+      borderRadius: "6px",
+      cursor: "pointer",
+      fontWeight: "bold",
+    },
+    notificationModal: {
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      width: "80%",
+      maxWidth: "500px",
+      background: "linear-gradient(135deg, #dc3545, #ffc107)",
+      color: "white",
+      padding: "20px",
+      borderRadius: "12px",
+      boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
+      zIndex: 2002,
+      fontFamily: "'Arial', sans-serif",
+    },
+    notificationButton: {
+      backgroundColor: "#dc3545",
+      color: "white",
+      padding: "8px 16px",
+      border: "none",
+      borderRadius: "6px",
+      cursor: "pointer",
+      fontWeight: "bold",
+    },
+    feedbackButton: {
+      margin: "10px",
+      padding: "8px 16px",
+      width: "150px",
+      background: "linear-gradient(135deg, #007bff, #0056b3)",
+      color: "white",
+      border: "none",
+      borderRadius: "6px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+      transition: "transform 0.2s, background 0.2s",
+    },
   };
 
   const stylesString = `
-    @keyframes popUp { 0% { opacity: 0; transform: translateY(-10px); } 50% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-10px); } }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-    .switch-button:hover {
-      transform: scale(1.05);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    }
-    .start-day-button:hover {
-      transform: scale(1.05);
-      background: linear-gradient(135deg, #0056b3, #003d80);
-    }
-    .start-week-button:hover {
-      transform: scale(1.05);
-      background: linear-gradient(135deg, #1e7e34, #155927);
-    }
+   @keyframes popUp { 0% { opacity: 0; transform: translateY(-10px); } 50% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-10px); } }
+  @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+  
+  /* Button hover effects */
+  .switch-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(135deg, #117a8b, #0d5f6e);
+  }
+  .start-day-button:hover {
+    transform: scale(1.05);
+    background: linear-gradient(135deg, #0056b3, #003d80);
+  }
+  .start-week-button:hover {
+    transform: scale(1.05);
+    background: linear-gradient(135deg, #1e7e34, #155927);
+  }
+  .apply-global-boost-button:hover {
+    transform: scale(1.05);
+    background: linear-gradient(135deg, #a71d2a, #7a1a1f);
+  }
+  .feedback-button:hover {
+    transform: scale(1.05);
+    background: linear-gradient(135deg, #0056b3, #003d80);
+  }
+  .save-progress-button:hover {
+    transform: scale(1.05);
+    background: #0056b3;
+  }
+  .btn-success:hover {
+    transform: scale(1.05);
+    background: #218838;
+  }
+  .btn-danger:hover {
+    transform: scale(1.05);
+    background: #c82333;
+  }
+  .btn-warning:hover {
+    transform: scale(1.05);
+    background: #e0a800;
+  }
+  .btn-info:hover {
+    transform: scale(1.05);
+    background: #138496;
+  }
+  .btn-primary:hover {
+    transform: scale(1.05);
+    background: #0069d9;
+  }
+  .nav-logout:hover {
+    transform: scale(1.05);
+    background: #dc3545;
+  }
   `;
 
   const toggleAchievementSection = (category) => {
@@ -272,6 +480,82 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
 
   return (
     <div style={styles.containerFluid}>
+      <video autoPlay muted loop style={styles.videoBackground}>
+        <source src="/videos/backvideo2.mp4" type="video/mp4" />
+      </video>
+      <div style={styles.videoOverlay}></div>
+      {isSyncing && (
+        <div style={styles.syncOverlay}>Syncing, please wait...</div>
+      )}
+      {showTutorial && (
+        <>
+          <div
+            style={styles.tutorialOverlay}
+            onClick={() => setShowTutorial(false)}
+          ></div>
+          <div style={styles.tutorialModal} className="tutorial-modal">
+            <h3 style={{ marginBottom: "20px", fontWeight: "bold" }}>
+              Welcome to Daily Mode
+            </h3>
+            <div style={styles.tutorialContent}>
+              <ul style={{ paddingLeft: "20px" }}>
+                {normalTutorialMessages.map((msg, index) => (
+                  <li key={index} style={{ marginBottom: "10px" }}>
+                    {msg}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginBottom: "20px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={dontShowTutorial}
+                onChange={handleDontShowChange}
+                style={styles.tutorialCheckbox}
+                id="dontShowTutorial"
+              />
+              <label htmlFor="dontShowTutorial">Don't show this again</label>
+            </div>
+            <button
+              onClick={() => setShowTutorial(false)}
+              style={styles.tutorialButton}
+            >
+              Got It!
+            </button>
+          </div>
+        </>
+      )}
+      {notifications
+        .filter((n) => n.global && !dismissedNotifications.includes(n.id))
+        .map((notification) => (
+          <React.Fragment key={notification.id}>
+            <div
+              style={styles.tutorialOverlay}
+              onClick={() => dismissNotification(notification.id)}
+            ></div>
+            <div
+              style={styles.notificationModal}
+              className="notification-modal"
+            >
+              <h3 style={{ marginBottom: "20px", fontWeight: "bold" }}>
+                Notification
+              </h3>
+              <div style={styles.tutorialContent}>{notification.message}</div>
+              <button
+                onClick={() => dismissNotification(notification.id)}
+                style={styles.notificationButton}
+              >
+                Close
+              </button>
+            </div>
+          </React.Fragment>
+        ))}
       <style>{stylesString}</style>
       <nav style={styles.normalmodenav}>
         <div className="nav-brand">
@@ -286,9 +570,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
         <div className="nav-links">
           <Link to="/dashboard" className="nav-link">
             <i className="bi bi-house-fill"></i> Dashboard
-          </Link>
-          <Link to="/normal-mode" className="nav-link">
-            <i className="bi bi-star-fill"></i> Program
           </Link>
           <Link to="/statistics" className="nav-link">
             <i className="bi bi-bar-chart-fill"></i> Statistics
@@ -332,7 +613,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
           </div>
         ) : (
           <>
-            {/* Profile, Points Progress, and Monthly Points Progress in One Row */}
             <div className="row mb-4">
               <div className="col-12 col-md-4 mb-3">
                 <div style={styles.dashboardCard} className="card shadow-sm">
@@ -474,7 +754,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
               </div>
             </div>
 
-            {/* Apply a Boost Card */}
             <div className="row mb-4" id="apply-boost">
               <div className="col-12">
                 <div style={styles.dashboardCard} className="card shadow-sm">
@@ -535,7 +814,94 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
               </div>
             </div>
 
-            {/* Start Buttons */}
+            {auth.currentUser?.email === "admin@gmail.com" && (
+              <div className="row mb-4" id="admin-apply-global-boost">
+                <div className="col-12">
+                  <div style={styles.dashboardCard} className="card shadow-sm">
+                    <div className="p-3">
+                      <h6 style={{ fontSize: "16px", fontWeight: "bold" }}>
+                        Admin: Global Controls
+                      </h6>
+                      <div className="d-flex align-items-center flex-wrap">
+                        <select
+                          value={adminSelectedTaskId}
+                          onChange={(e) =>
+                            setAdminSelectedTaskId(e.target.value)
+                          }
+                          className="me-2 mb-2"
+                        >
+                          <option value="">Select a Task</option>
+                          {Object.entries(globalTasks).map(([taskId, task]) => (
+                            <option key={taskId} value={taskId}>
+                              {task.name}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={adminSelectedBoost}
+                          onChange={(e) =>
+                            setAdminSelectedBoost(e.target.value)
+                          }
+                          className="me-2 mb-2"
+                        >
+                          <option value="">Select a Boost</option>
+                          {Object.entries({
+                            DoubleEverything: {
+                              description: "Jackpot : Double Points",
+                            },
+                            "+30Percent": {
+                              description:
+                                "The Investor : Increases Points by 30%",
+                            },
+                            TheSavior: {
+                              description: "The Savior : Multiple completions",
+                            },
+                            DoubleOrDie: {
+                              description: "العذاب المعسول :Double or -10",
+                            },
+                            PerfectBonus: { description: "50 point bonus" },
+                          }).map(([key, boost]) => (
+                            <option key={key} value={key}>
+                              {boost.description}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() =>
+                            applyGlobalBoost(
+                              adminSelectedTaskId,
+                              adminSelectedBoost
+                            )
+                          }
+                          className="mb-2 apply-global-boost-button me-2"
+                        >
+                          Apply Globally
+                        </button>
+                        <button
+                          onClick={startWeekForAllUsers}
+                          className="mb-2 apply-global-boost-button me-2"
+                        >
+                          Start Week for All Users
+                        </button>
+                        <button
+                          onClick={sendGlobalNotification}
+                          className="mb-2 apply-global-boost-button me-2"
+                        >
+                          Send Global Notification
+                        </button>
+                        <button
+                          onClick={viewFeedback}
+                          className="mb-2 apply-global-boost-button"
+                        >
+                          View Feedback
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="row mb-4" id="start-buttons">
               <div className="d-flex justify-content-between">
                 <button
@@ -548,6 +914,19 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                   Start Today
                 </button>
                 <button
+                  onClick={handleSaveProgress}
+                  style={{
+                    ...styles.saveProgressButton,
+                    ...(isSyncing ? styles.saveProgressButtonSaving : {}),
+                  }}
+                  className="btn save-progress-button"
+                  title="Save your current progress"
+                  disabled={isSyncing}
+                >
+                  <i className="bi bi-save-fill me-2"></i>
+                  {isSyncing ? "Saving..." : "Save Your Progress"}
+                </button>
+                <button
                   onClick={startTheWeek}
                   style={styles.startWeekButton}
                   className="btn start-week-button"
@@ -556,10 +935,20 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                   <i className="bi bi-calendar-week me-2"></i>
                   Start This Week
                 </button>
+                {auth.currentUser?.email !== "admin@gmail.com" && (
+                  <button
+                    onClick={submitFeedback}
+                    style={styles.feedbackButton}
+                    className="btn feedback-button"
+                    title="Share your feedback"
+                  >
+                    <i className="bi bi-chat-text-fill me-2"></i>
+                    Give Feedback
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Daily Tasks and Completed Tasks */}
             <div className="row">
               <div className="col-12 col-md-6 mb-3">
                 <div
@@ -741,7 +1130,8 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                                             .filter(
                                               (n) =>
                                                 n.position ===
-                                                `task-${originalIndex}`
+                                                  `task-${originalIndex}` &&
+                                                !n.global
                                             )
                                             .map((notification) => (
                                               <div

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { auth, database } from "../firebase";
 import { signOut } from "firebase/auth";
 import { useNavigate, Link } from "react-router-dom";
@@ -15,6 +15,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     notifications,
     openSections,
     isLoading,
+    isSyncing,
     selectedTaskIndex,
     setSelectedTaskIndex,
     selectedBoost,
@@ -43,10 +44,63 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     switchMode,
     adjustMonthlyPoints,
     adjustPoints,
+    syncWithFirebase,
+    normalTutorialMessages,
+    sendGlobalNotification,
+    submitFeedback,
+    viewFeedback,
+    applyGlobalBoost,
+    startWeekForAllUsers,
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "daily");
 
   const [openAchievementSections, setOpenAchievementSections] = useState({});
   const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = useState(false);
+
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [dontShowTutorial, setDontShowTutorial] = useState(false);
+  const [adminSelectedTaskId, setAdminSelectedTaskId] = useState("");
+  const [adminSelectedBoost, setAdminSelectedBoost] = useState("");
+  const [dismissedNotifications, setDismissedNotifications] = useState(() => {
+    return (
+      JSON.parse(
+        localStorage.getItem(`dismissedNotifications_${auth.currentUser?.uid}`)
+      ) || []
+    );
+  });
+
+  const contentHash = JSON.stringify(normalTutorialMessages);
+
+  // Handle tutorial visibility and content change
+  useEffect(() => {
+    const storedHash = localStorage.getItem("tutorialContentHash");
+    const storedDontShow = localStorage.getItem("dontShowTutorial") === "true";
+
+    if (storedHash !== contentHash) {
+      localStorage.setItem("tutorialContentHash", contentHash);
+      localStorage.removeItem("dontShowTutorial");
+      setShowTutorial(true);
+    } else if (!storedDontShow) {
+      setShowTutorial(true);
+    }
+    setDontShowTutorial(storedDontShow);
+  }, [contentHash]);
+
+  const dismissNotification = (notificationId) => {
+    setDismissedNotifications((prev) => [...prev, notificationId]);
+  };
+  // Handle checkbox toggle
+  const handleDontShowChange = (e) => {
+    const checked = e.target.checked;
+    setDontShowTutorial(checked);
+    localStorage.setItem("dontShowTutorial", checked);
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      syncWithFirebase(true);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [syncWithFirebase]);
 
   const handleSwitchToWeekly = () => {
     Swal.fire({
@@ -85,7 +139,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       width: "100%",
       height: "100%",
       backgroundColor: "rgba(0, 0, 0, 0.02)",
-      zIndex: 0,
+      zIndex: -2,
     },
     dashboardContent: {
       marginTop: "50px",
@@ -100,12 +154,12 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       boxShadow: "0 0 5px rgba(255, 255, 255, 0.5)",
     },
     cardBody: { padding: "8px" },
-    cardTitle: { fontSize: "11px", fontWeight: 600, color: "white" },
+    cardTitle: { fontSize: "11px", fontWeight: 600, color: "black" },
     listGroupItem: {
       backgroundColor: "transparent",
       border: "none",
       fontSize: "12px",
-      color: "white",
+      color: "black",
     },
     penaltyListGroupItem: {
       backgroundColor: "rgba(139, 0, 0, 0.1)",
@@ -146,7 +200,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       background: "linear-gradient(135deg, #ff6b6b, #ffc107)",
       boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
     },
-    progressText: { fontSize: "16px", fontWeight: "bold", color: "white" },
+    progressText: { fontSize: "16px", fontWeight: "bold", color: "black" },
     progressIcon: {
       fontSize: "18px",
       marginBottom: "4px",
@@ -159,6 +213,21 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       borderRadius: "3px",
       marginLeft: "4px",
       height: "30px",
+    },
+    saveProgressButton: {
+      margin: "4px",
+      padding: "6px 12px",
+      width: "120px",
+      background: "linear-gradient(135deg, #007bff, #0056b3)",
+      color: "white",
+      border: "none",
+      borderRadius: "3px",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
     },
     startWeekButton: {
       margin: "4px",
@@ -175,6 +244,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       alignItems: "center",
       justifyContent: "center",
       transition: "transform 0.2s, background 0.2s",
+      zIndex: 5,
     },
     startDayButton: {
       margin: "4px",
@@ -191,6 +261,24 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       alignItems: "center",
       justifyContent: "center",
       transition: "transform 0.2s, background 0.2s",
+      zIndex: 5,
+    },
+    feedbackButton: {
+      margin: "4px",
+      padding: "6px 12px",
+      width: "120px",
+      background: "linear-gradient(135deg, #007bff, #0056b3)",
+      color: "white",
+      border: "none",
+      borderRadius: "3px",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "transform 0.2s, background 0.2s",
+      zIndex: 5,
     },
     switchButton: {
       margin: "4px",
@@ -206,6 +294,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       alignItems: "center",
       justifyContent: "center",
       transition: "transform 0.2s, background 0.2s",
+      zIndex: 5,
     },
     normalmodenav: {
       position: "fixed",
@@ -254,6 +343,73 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       width: "100%",
     },
     achievementSection: { margin: "4px 0" },
+    tutorialModal: {
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      width: "90%",
+      maxWidth: "300px",
+      background: "linear-gradient(135deg, #007bff, #28a745)",
+      color: "white",
+      padding: "12px",
+      borderRadius: "8px",
+      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
+      zIndex: 2002,
+      fontFamily: "'Arial', sans-serif",
+    },
+    tutorialOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      background: "rgba(0, 0, 0, 0.6)",
+      zIndex: 2001,
+    },
+    tutorialContent: {
+      fontSize: "11px",
+      lineHeight: "1.4",
+      marginBottom: "12px",
+    },
+    tutorialCheckbox: {
+      marginRight: "8px",
+    },
+    tutorialButton: {
+      backgroundColor: "#ffc107",
+      color: "#000",
+      padding: "6px 12px",
+      border: "none",
+      borderRadius: "3px",
+      cursor: "pointer",
+      fontWeight: "bold",
+      fontSize: "11px",
+    },
+    notificationModal: {
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      width: "90%",
+      maxWidth: "300px",
+      background: "linear-gradient(135deg, #dc3545, #ffc107)",
+      color: "white",
+      padding: "12px",
+      borderRadius: "8px",
+      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
+      zIndex: 2002,
+      fontFamily: "'Arial', sans-serif",
+    },
+    notificationButton: {
+      backgroundColor: "#dc3545",
+      color: "white",
+      padding: "6px 12px",
+      border: "none",
+      borderRadius: "3px",
+      cursor: "pointer",
+      fontWeight: "bold",
+      fontSize: "11px",
+    },
   };
 
   const stylesString = `
@@ -271,6 +427,26 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       transform: scale(1.05);
       background: linear-gradient(135deg, #1e7e34, #155927);
     }
+    .feedback-button:hover, .feedback-button:active {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #0056b3, #003d80);
+    }
+    .apply-global-boost-button {
+      margin: 4px;
+      padding: 6px 12px;
+      background: linear-gradient(135deg, #dc3545, #a71d2a);
+      color: white;
+      border: none;
+      borderRadius: 3px;
+      fontSize: 11px;
+      minWidth: 44px;
+      minHeight: 44px;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .apply-global-boost-button:hover, .apply-global-boost-button:active {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #a71d2a, #7a1a1f);
+    }  
   `;
 
   const toggleAchievementSection = (category) => {
@@ -280,10 +456,106 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     }));
   };
 
+  const handleSaveProgress = async () => {
+    try {
+      await syncWithFirebase(true);
+      Swal.fire({
+        icon: "success",
+        title: "Progress Saved!",
+        text: "Your progress has been synced to the server.",
+        timer: 1500,
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: "Failed to save progress. Your changes are saved locally.",
+      });
+    }
+  };
+
   const sortedCategories = ["Average", "Advanced", "Master"];
 
   return (
     <div style={styles.containerFluid}>
+      {isSyncing && (
+        <div style={styles.syncOverlay}>Syncing, please wait...</div>
+      )}
+      {showTutorial && (
+        <>
+          <div
+            style={styles.tutorialOverlay}
+            onClick={() => setShowTutorial(false)}
+          ></div>
+          <div style={styles.tutorialModal} className="tutorial-modal">
+            <h3 style={{ marginBottom: "20px", fontWeight: "bold" }}>
+              Welcome to Daily Mode
+            </h3>
+            <div style={styles.tutorialContent}>
+              <ul style={{ paddingLeft: "20px" }}>
+                {normalTutorialMessages.map((msg, index) => (
+                  <li key={index} style={{ marginBottom: "10px" }}>
+                    {msg}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginBottom: "20px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={dontShowTutorial}
+                onChange={handleDontShowChange}
+                style={styles.tutorialCheckbox}
+                id="dontShowTutorial"
+              />
+              <label htmlFor="dontShowTutorial">Don't show this again</label>
+            </div>
+            <button
+              onClick={() => setShowTutorial(false)}
+              style={styles.tutorialButton}
+            >
+              Got It!
+            </button>
+          </div>
+        </>
+      )}
+      {notifications
+        .filter((n) => n.global && !dismissedNotifications.includes(n.id))
+        .map((notification) => (
+          <React.Fragment key={notification.id}>
+            <div
+              style={styles.tutorialOverlay}
+              onClick={() => dismissNotification(notification.id)}
+            ></div>
+            <div
+              style={styles.notificationModal}
+              className="notification-modal"
+            >
+              <h3
+                style={{
+                  marginBottom: "12px",
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                }}
+              >
+                Notification
+              </h3>
+              <div style={styles.tutorialContent}>{notification.message}</div>
+              <button
+                onClick={() => dismissNotification(notification.id)}
+                style={styles.notificationButton}
+              >
+                Close
+              </button>
+            </div>
+          </React.Fragment>
+        ))}
       <video autoPlay loop muted style={styles.videoBackground}>
         <source src="/videos/backvideo2.mp4" type="video/mp4" />
         Your browser does not support the video tag.
@@ -341,7 +613,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
             >
               <span className="visually-hidden">Loading...</span>
             </div>
-            <p className="mt-2" style={{ fontSize: "12px", color: "white" }}>
+            <p className="mt-2" style={{ fontSize: "12px", color: "black" }}>
               Loading tasks...
             </p>
           </div>
@@ -490,6 +762,94 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                 </div>
               </div>
             </div>
+            {auth.currentUser?.email === "admin@gmail.com" && (
+              <div className="row mb-2">
+                <div className="col-12">
+                  <div style={styles.dashboardCard} className="card">
+                    <div className="p-2">
+                      <h6
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: "bold",
+                          color: "black",
+                        }}
+                      >
+                        Admin: Global Controls
+                      </h6>
+                      <div className="d-flex align-items-center flex-wrap">
+                        <select
+                          value={adminSelectedTaskId}
+                          onChange={(e) =>
+                            setAdminSelectedTaskId(e.target.value)
+                          }
+                          className="mb-2 me-2"
+                          style={{ fontSize: "11px", height: "30px" }}
+                        >
+                          <option value="">Select Task</option>
+                          {Object.entries(globalTasks).map(([taskId, task]) => (
+                            <option key={taskId} value={taskId}>
+                              {task.name}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={adminSelectedBoost}
+                          onChange={(e) =>
+                            setAdminSelectedBoost(e.target.value)
+                          }
+                          className="mb-2 me-2"
+                          style={{ fontSize: "11px", height: "30px" }}
+                        >
+                          <option value="">Select Boost</option>
+                          {Object.entries({
+                            DoubleEverything: { description: "Doubles Points" },
+                            "+30Percent": {
+                              description: "Increases Points by 30%",
+                            },
+                            TheSavior: { description: "Multiple completions" },
+                            DoubleOrDie: { description: "Double or -10" },
+                            PerfectBonus: { description: "50 point bonus" },
+                          }).map(([key, boost]) => (
+                            <option key={key} value={key}>
+                              {key} - {boost.description}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() =>
+                            applyGlobalBoost(
+                              adminSelectedTaskId,
+                              adminSelectedBoost
+                            )
+                          }
+                          className="mb-2 me-2 apply-global-boost-button"
+                        >
+                          Apply Globally
+                        </button>
+                        <button
+                          onClick={startWeekForAllUsers}
+                          className="mb-2 me-2 apply-global-boost-button"
+                        >
+                          Start Week for All
+                        </button>
+                        <button
+                          onClick={sendGlobalNotification}
+                          className="mb-2 me-2 apply-global-boost-button"
+                        >
+                          Send Notification
+                        </button>
+                        <button
+                          onClick={viewFeedback}
+                          className="mb-2 apply-global-boost-button"
+                        >
+                          View Feedback
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Apply Boost Section */}
             <div className="row mb-2">
@@ -500,7 +860,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       style={{
                         fontSize: "11px",
                         fontWeight: "bold",
-                        color: "white",
+                        color: "black",
                       }}
                     >
                       Apply Boost
@@ -573,16 +933,29 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                   Start Week
                 </button>
                 <button
-                  onClick={refreshGlobalTasksFromLogic}
+                  onClick={handleSaveProgress}
                   style={{
-                    ...styles.startWeekButton,
-                    background: "linear-gradient(135deg, #ffc107, #e0a800)",
+                    ...styles.saveProgressButton,
+                    ...(isSyncing ? styles.saveProgressButtonSaving : {}),
                   }}
-                  className="btn"
+                  className="btn save-progress-button"
+                  title="Save your current progress"
+                  disabled={isSyncing}
                 >
-                  <i className="bi bi-arrow-clockwise me-1"></i>
-                  Refresh Tasks
+                  <i className="bi bi-save-fill me-2"></i>
+                  {isSyncing ? "Saving..." : "Save Your Progress"}
                 </button>
+                {auth.currentUser?.email !== "admin@gmail.com" && (
+                  <button
+                    onClick={submitFeedback}
+                    style={styles.feedbackButton}
+                    className="btn feedback-button"
+                    title="Share your feedback"
+                  >
+                    <i className="bi bi-chat-text-fill me-1"></i>
+                    Feedback
+                  </button>
+                )}
               </div>
             </div>
 
@@ -614,7 +987,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 style={{
                                   fontSize: "11px",
                                   background: "transparent",
-                                  color: "white",
+                                  color: "black",
                                 }}
                               >
                                 {category} ({categoryTasks.length})
@@ -787,7 +1160,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 ) : (
                                   <p
                                     className="text-muted small"
-                                    style={{ fontSize: "11px", color: "white" }}
+                                    style={{ fontSize: "11px", color: "black" }}
                                   >
                                     No tasks in this category
                                   </p>
@@ -857,7 +1230,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                     ) : (
                       <p
                         className="text-muted text-center small"
-                        style={{ fontSize: "11px", color: "white" }}
+                        style={{ fontSize: "11px", color: "black" }}
                       >
                         No completed tasks today.
                       </p>
@@ -931,7 +1304,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       ) : (
                         <p
                           className="text-muted text-center small"
-                          style={{ fontSize: "11px", color: "white" }}
+                          style={{ fontSize: "11px", color: "black" }}
                         >
                           No completed tasks this week.
                         </p>
@@ -1005,21 +1378,21 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 fontSize: "11px",
                                 background: "transparent",
                                 border: "none",
-                                color: "white",
+                                color: "black",
                               }}
                             >
                               <div>
                                 <span
                                   style={{
                                     fontWeight: isEarned ? "bold" : "normal",
-                                    color: isEarned ? "#28a745" : "white",
+                                    color: isEarned ? "#28a745" : "black",
                                   }}
                                 >
                                   {achievement.name} - {achievement.description}
                                 </span>
                                 <br />
                                 <small
-                                  style={{ fontSize: "9px", color: "white" }}
+                                  style={{ fontSize: "9px", color: "black" }}
                                 >
                                   Progress: {progress}/{achievement.target}{" "}
                                   {isEarned

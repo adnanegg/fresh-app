@@ -6,7 +6,7 @@ import Swal from "sweetalert2";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 
-const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
+const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
   const {
     userData,
     notifications,
@@ -41,13 +41,11 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
     switchMode,
     missTask,
     syncWithFirebase,
-    removeNotification,
     submitFeedback,
+    viewFeedback,
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "weekly");
 
-  const [openAchievementSections, setOpenAchievementSections] = React.useState(
-    {}
-  );
+  const [openAchievementSections, setOpenAchievementSections] = useState({});
   const [showTutorial, setShowTutorial] = useState(false);
   const [dontShowTutorial, setDontShowTutorial] = useState(false);
   const [dismissedNotifications, setDismissedNotifications] = useState(() => {
@@ -59,12 +57,12 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
   });
 
   // Tutorial content
-  const weeklyTutorialMessages = [
+  const tutorialMessages = [
     'Click the "Start This Week" button to begin your weekly tasks.',
     "Remember to apply this week's boost for extra benefits.",
     "Save your progress before you leave to keep your changes safe.",
   ];
-  const contentHash = JSON.stringify(weeklyTutorialMessages);
+  const contentHash = JSON.stringify(tutorialMessages);
 
   // Handle tutorial visibility and content change
   useEffect(() => {
@@ -91,17 +89,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
     localStorage.setItem("dontShowTutorial", checked);
   };
 
-  // Clean up notifications after 3 seconds
-  useEffect(() => {
-    const timers = notifications.map((notification) => {
-      return setTimeout(() => {
-        removeNotification(notification.id);
-      }, 1500);
-    });
-    return () => timers.forEach((timer) => clearTimeout(timer));
-  }, [notifications, removeNotification]);
-
-  // Sync every 30 seconds
+  // Sync every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       syncWithFirebase(true);
@@ -112,75 +100,33 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
   const styles = {
     container: {
       padding: 0,
+      minHeight: "100vh",
     },
     dashboardContent: {
       marginTop: "60px",
+      padding: "10px",
       flex: 1,
       zIndex: 10,
-      justifyContent: "center",
     },
     dashboardCard: {
-      borderRadius: "8px",
-      background: "none",
-      boxShadow: "none",
+      borderRadius: "6px",
+      background: "transparent",
+      border: "1px solid rgba(255, 255, 255, 0.3)",
+      boxShadow: "0 0 5px rgba(255, 255, 255, 0.5)",
     },
     cardBody: {
-      padding: "12px",
+      padding: "8px",
     },
     cardTitle: {
-      fontSize: "14px",
+      fontSize: "11px",
       fontWeight: 600,
+      color: "black",
     },
     listGroupItem: {
       backgroundColor: "transparent",
       border: "none",
-    },
-    penaltyListGroupItem: {
-      backgroundColor: "rgba(139, 0, 0, 0.1)",
-      border: "1px solid #8b0000",
-      color: "#ff4040",
-      fontWeight: "bold",
-      padding: "8px",
-      borderRadius: "4px",
-    },
-    formSelectSm: {
       fontSize: "12px",
-      padding: "4px 8px",
-      borderRadius: "4px",
-      width: "120px",
-    },
-    taskNotification: {
-      position: "absolute",
-      top: "-20px",
-      right: 0,
-      fontSize: "12px",
-      color: "#28a745",
-      fontWeight: "bold",
-      animation: "popUp 3s ease-out forwards",
-    },
-    pointsProgress: {
-      textAlign: "center",
-      padding: "15px",
-      borderRadius: "8px",
-      background: "linear-gradient(135deg, #ff6b6b, #007bff)",
-      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-    },
-    monthlyPointsProgress: {
-      textAlign: "center",
-      padding: "15px",
-      borderRadius: "8px",
-      background: "linear-gradient(135deg, #ff6b6b, #ffc107)",
-      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-    },
-    progressText: {
-      fontSize: "24px",
-      fontWeight: "bold",
-      color: "white",
-    },
-    progressIcon: {
-      fontSize: "30px",
-      marginBottom: "10px",
-      animation: "pulse 2s infinite ease-in-out",
+      color: "black",
     },
     videoBackground: {
       position: "fixed",
@@ -197,128 +143,199 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
       left: 0,
       width: "100%",
       height: "100%",
-      backgroundColor: "rgba(0, 0, 0, 0)",
+      backgroundColor: "rgba(0, 0, 0, 0.02)",
       zIndex: -2,
     },
-    timesInput: {
-      width: "80px",
+    penaltyListGroupItem: {
+      backgroundColor: "rgba(139, 0, 0, 0.1)",
+      border: "1px solid #8b0000",
+      color: "#ff4040",
+      fontWeight: "bold",
+      padding: "4px",
+      borderRadius: "3px",
+      fontSize: "12px",
+    },
+    formSelectSm: {
+      fontSize: "9px",
+      padding: "2px 4px",
+      borderRadius: "3px",
+      width: "90px",
+      height: "30px",
+    },
+    taskNotification: {
+      position: "absolute",
+      top: "-12px",
+      right: 0,
+      fontSize: "9px",
+      color: "#28a745",
+      fontWeight: "bold",
+      animation: "popUp 3s ease-out forwards",
+    },
+    pointsProgress: {
+      textAlign: "center",
       padding: "8px",
-      fontSize: "16px",
       borderRadius: "6px",
-      marginLeft: "10px",
+      background: "linear-gradient(135deg, #ff6b6b, #007bff)",
+      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+    },
+    monthlyPointsProgress: {
+      textAlign: "center",
+      padding: "8px",
+      borderRadius: "6px",
+      background: "linear-gradient(135deg, #ff6b6b, #ffc107)",
+      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+    },
+    progressText: {
+      fontSize: "16px",
+      fontWeight: "bold",
+      color: "black",
+    },
+    progressIcon: {
+      fontSize: "18px",
+      marginBottom: "4px",
+      animation: "pulse 2s infinite ease-in-out",
+    },
+    timesInput: {
+      width: "50px",
+      padding: "3px",
+      fontSize: "11px",
+      borderRadius: "3px",
+      marginLeft: "4px",
+      height: "30px",
     },
     startWeekButton: {
-      margin: "10px",
-      padding: "10px 20px",
-      backgroundColor: "#28a745",
+      margin: "4px",
+      padding: "6px 12px",
+      width: "120px",
+      background: "linear-gradient(135deg, #28a745, #1e7e34)",
       color: "white",
       border: "none",
-      borderRadius: "6px",
+      borderRadius: "3px",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 5,
     },
-    startWeekButtonHover: {
-      transform: "scale(1.05)",
-      background: "linear-gradient(135deg, #1e7e34, #155927)",
+    refreshTasksButton: {
+      margin: "4px",
+      padding: "6px 12px",
+      width: "120px",
+      background: "linear-gradient(135deg, #ffc107, #e0a800)",
+      color: "white",
+      border: "none",
+      borderRadius: "3px",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 5,
     },
     saveProgressButton: {
-      margin: "10px",
-      padding: "8px 16px",
-      backgroundColor: "#007bff",
+      margin: "4px",
+      padding: "6px 12px",
+      width: "120px",
+      background: "linear-gradient(135deg, #007bff, #0056b3)",
       color: "white",
       border: "none",
-      borderRadius: "6px",
-      transition: "background-color 0.2s",
+      borderRadius: "3px",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
     },
-    saveProgressButtonSaving: {
-      backgroundColor: "#0056b3",
-      animation: "pulse 1.5s infinite ease-in-out",
+    switchButton: {
+      margin: "4px",
+      padding: "6px 12px",
+      background: "linear-gradient(135deg, #17a2b8, #117a8b)",
+      color: "white",
+      border: "none",
+      borderRadius: "3px",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
     },
     normalModeNav: {
       position: "fixed",
       top: 0,
       width: "100%",
       background: "#ffc107",
-      padding: "1rem 2rem",
+      padding: "0.4rem 0.8rem",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       zIndex: 1000,
     },
-    profileSection: {
-      position: "relative",
-      padding: "10px 0",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
+    navLogo: {
+      width: "25px",
     },
-    switchButtonRow: {
-      margin: "10px 0",
-      textAlign: "center",
+    navTitle: {
+      fontSize: "12px",
     },
-    switchToDaily: {
-      padding: "10px 20px",
-      backgroundColor: "#17a2b8",
+    navLinks: {
+      fontSize: "11px",
+    },
+    navLogout: {
+      padding: "2px 4px",
+      minWidth: "44px",
+      minHeight: "44px",
+    },
+    userId: {
+      fontSize: "9px",
+    },
+    bronzeStar: {
+      color: "#cd7f32",
+      fontSize: "12px",
+    },
+    silverStar: {
+      color: "#c0c0c0",
+      fontSize: "12px",
+    },
+    goldStar: {
+      color: "#ffd700",
+      fontSize: "12px",
+    },
+    loadingText: {
+      fontSize: "12px",
+      color: "black",
+    },
+    applyBoostTitle: {
+      fontSize: "11px",
+      fontWeight: "bold",
+      color: "black",
+    },
+    taskStats: {
+      fontSize: "10px",
+      color: "black",
+      display: "block",
+    },
+    noTasks: {
+      fontSize: "11px",
       color: "white",
-      border: "none",
-      borderRadius: "6px",
-    },
-    switchToDailyHover: {
-      transform: "scale(1.05)",
-      background: "linear-gradient(135deg, #117a8b, #0d5f6e)",
     },
     achievementsModal: {
       position: "fixed",
       top: "50%",
       left: "50%",
       transform: "translate(-50%, -50%)",
-      width: "90%",
-      maxHeight: "80vh",
-      background: "white",
-      padding: "20px",
-      borderRadius: "8px",
-      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+      width: "95%",
+      maxHeight: "85vh",
+      background: "transparent",
+      padding: "12px",
+      borderRadius: "6px",
+      border: "1px solid rgba(255, 255, 255, 0.3)",
+      boxShadow: "0 0 5px rgba(255, 255, 255, 0.5)",
       zIndex: 2000,
       overflowY: "auto",
-    },
-    tutorialModal: {
-      position: "fixed",
-      top: "50%",
-      left: "50%",
-      transform: "translate(-50%, -50%)",
-      width: "80%",
-      maxWidth: "500px",
-      background: "linear-gradient(135deg, #007bff, #28a745)",
-      color: "white",
-      padding: "20px",
-      borderRadius: "12px",
-      boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
-      zIndex: 2002,
-      fontFamily: "'Arial', sans-serif",
-    },
-    tutorialOverlay: {
-      position: "fixed",
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
-      background: "rgba(0, 0, 0, 0.6)",
-      zIndex: 2001,
-    },
-    tutorialContent: {
-      fontSize: "16px",
-      lineHeight: "1.6",
-      marginBottom: "20px",
-    },
-    tutorialCheckbox: {
-      marginRight: "10px",
-    },
-    tutorialButton: {
-      backgroundColor: "#ffc107",
-      color: "#000",
-      padding: "8px 16px",
-      border: "none",
-      borderRadius: "6px",
-      cursor: "pointer",
-      fontWeight: "bold",
     },
     overlay: {
       position: "fixed",
@@ -331,17 +348,67 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
     },
     achievementsContainer: {
       display: "flex",
-      flexDirection: "row",
-      justifyContent: "space-between",
+      flexDirection: "column",
       width: "100%",
     },
     achievementSection: {
-      flex: 1,
-      margin: "0 10px",
+      margin: "4px 0",
     },
-    applyBoostTitle: {
-      fontSize: "16px",
+    achievementsTitle: {
+      fontSize: "12px",
+      color: "black",
+    },
+    earnedAchievement: {
       fontWeight: "bold",
+      color: "#28a745",
+    },
+    tutorialModal: {
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      width: "95%",
+      maxHeight: "85vh",
+      background: "linear-gradient(135deg, #007bff, #28a745)",
+      color: "white",
+      padding: "16px",
+      borderRadius: "12px",
+      boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
+      zIndex: 2002,
+      fontFamily: "'Arial', sans-serif",
+      overflowY: "auto",
+    },
+    tutorialOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      background: "rgba(0, 0, 0, 0.6)",
+      zIndex: 2001,
+    },
+    tutorialContent: {
+      fontSize: "12px",
+      lineHeight: "1.6",
+      marginBottom: "16px",
+    },
+    tutorialCheckbox: {
+      marginRight: "8px",
+    },
+    tutorialButton: {
+      backgroundColor: "#ffc107",
+      color: "#000",
+      padding: "6px 12px",
+      border: "none",
+      borderRadius: "6px",
+      cursor: "pointer",
+      fontWeight: "bold",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
     },
     syncOverlay: {
       position: "fixed",
@@ -356,122 +423,58 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
       justifyContent: "center",
       zIndex: 2001,
     },
-    feedbackButton: {
-      margin: "10px",
-      padding: "8px 16px",
-      width: "150px",
-      background: "linear-gradient(135deg, #007bff, #0056b3)",
-      color: "white",
-      border: "none",
+    syncOverlayText: {
+      background: "white",
+      padding: "12px 24px",
       borderRadius: "6px",
+      fontSize: "12px",
+      color: "#343a40",
       display: "flex",
       alignItems: "center",
-      justifyContent: "center",
-      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-      transition: "transform 0.2s, background 0.2s",
+      gap: "8px",
     },
     notificationModal: {
       position: "fixed",
       top: "50%",
       left: "50%",
       transform: "translate(-50%, -50%)",
-      width: "80%",
-      maxWidth: "500px",
+      width: "90%",
+      maxWidth: "300px",
       background: "linear-gradient(135deg, #dc3545, #ffc107)",
       color: "white",
-      padding: "20px",
-      borderRadius: "12px",
-      boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
+      padding: "12px",
+      borderRadius: "8px",
+      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
       zIndex: 2002,
       fontFamily: "'Arial', sans-serif",
     },
     notificationButton: {
       backgroundColor: "#dc3545",
       color: "white",
-      padding: "8px 16px",
+      padding: "6px 12px",
       border: "none",
-      borderRadius: "6px",
+      borderRadius: "3px",
       cursor: "pointer",
       fontWeight: "bold",
+      fontSize: "11px",
     },
-    switchButton: {
-      margin: "0",
-      padding: "8px 16px",
-      background: "linear-gradient(135deg, #17a2b8, #117a8b)",
+    feedbackButton: {
+      margin: "4px",
+      padding: "6px 12px",
+      width: "120px",
+      background: "linear-gradient(135deg, #007bff, #0056b3)",
       color: "white",
       border: "none",
-      borderRadius: "6px",
+      borderRadius: "3px",
+      fontSize: "11px",
+      minWidth: "44px",
+      minHeight: "44px",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-      transition: "box-shadow 0.2s, background 0.2s",
+      transition: "transform 0.2s, background 0.2s",
+      zIndex: 5,
     },
-  };
-  const stylesString = `
-  @keyframes popUp { 0% { opacity: 0; transform: translateY(-10px); } 50% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-10px); } }
-  @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-  
-  /* Button hover effects */
-  .switch-button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    background: linear-gradient(135deg, #117a8b, #0d5f6e);
-  }
-  .start-week-button:hover {
-    transform: scale(1.05);
-    background: linear-gradient(135deg, #1e7e34, #155927);
-  }
-  .save-progress-button:hover {
-    transform: scale(1.05);
-    background: #0056b3;
-  }
-  .feedback-button:hover {
-    transform: scale(1.05);
-    background: linear-gradient(135deg, #0056b3, #003d80);
-  }
-  .btn-success:hover {
-    transform: scale(1.05);
-    background: #218838;
-  }
-  .btn-danger:hover {
-    transform: scale(1.05);
-    background: #c82333;
-  }
-  .btn-warning:hover {
-    transform: scale(1.05);
-    background: #e0a800;
-  }
-  .btn-info:hover {
-    transform: scale(1.05);
-    background: #138496;
-  }
-  .btn-primary:hover {
-    transform: scale(1.05);
-    background: #0069d9;
-  }
-  .nav-logout:hover {
-    transform: scale(1.05);
-    background: #dc3545;
-  }
-`;
-
-  const handleSaveProgress = async () => {
-    try {
-      await syncWithFirebase(true);
-      Swal.fire({
-        icon: "success",
-        title: "Progress Saved!",
-        text: "Your progress has been synced to the server.",
-        timer: 1500,
-      });
-    } catch (error) {
-      Swal.fire({
-        icon: "error",
-        title: "Save Failed",
-        text: "Failed to save progress. Your changes are saved locally.",
-      });
-    }
   };
 
   const showTaskDescription = (taskId) => {
@@ -510,16 +513,60 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
     }));
   };
 
+  const handleSaveProgress = async () => {
+    try {
+      await syncWithFirebase(true);
+      Swal.fire({
+        icon: "success",
+        title: "Progress Saved!",
+        text: "Your progress has been synced to the server.",
+        timer: 1500,
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: "Failed to save progress. Your changes are saved locally.",
+      });
+    }
+  };
+
   const sortedCategories = ["Average", "Advanced", "Master"];
 
   return (
     <div style={styles.container} className="container-fluid">
-      <video autoPlay muted loop style={styles.videoBackground}>
+      <video autoPlay loop muted style={styles.videoBackground}>
         <source src="/videos/backvideo2.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
       </video>
       <div style={styles.videoOverlay}></div>
+      <style>
+        {`
+          @keyframes popUp {
+            0% { opacity: 0; transform: translateY(-10px); }
+            50% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-10px); }
+          }
+          @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+          }
+            .feedback-button:hover, .feedback-button:active {
+              transform: scale(1.05);
+              background: linear-gradient(135deg, #0056b3, #003d80);
+    }
+        `}
+      </style>
       {isSyncing && (
-        <div style={styles.syncOverlay}>Syncing, please wait...</div>
+        <div style={styles.syncOverlay} className="sync-overlay">
+          <div style={styles.syncOverlayText}>
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Syncing...</span>
+            </div>
+            Syncing, please wait...
+          </div>
+        </div>
       )}
       {showTutorial && (
         <>
@@ -528,13 +575,19 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
             onClick={() => setShowTutorial(false)}
           ></div>
           <div style={styles.tutorialModal} className="tutorial-modal">
-            <h3 style={{ marginBottom: "20px", fontWeight: "bold" }}>
+            <h3
+              style={{
+                marginBottom: "12px",
+                fontWeight: "bold",
+                fontSize: "14px",
+              }}
+            >
               Welcome to Weekly Mode
             </h3>
             <div style={styles.tutorialContent}>
-              <ul style={{ paddingLeft: "20px" }}>
-                {weeklyTutorialMessages.map((msg, index) => (
-                  <li key={index} style={{ marginBottom: "10px" }}>
+              <ul style={{ paddingLeft: "16px" }}>
+                {tutorialMessages.map((msg, index) => (
+                  <li key={index} style={{ marginBottom: "8px" }}>
                     {msg}
                   </li>
                 ))}
@@ -544,7 +597,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
               style={{
                 display: "flex",
                 alignItems: "center",
-                marginBottom: "20px",
+                marginBottom: "12px",
               }}
             >
               <input
@@ -554,7 +607,9 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                 style={styles.tutorialCheckbox}
                 id="dontShowTutorial"
               />
-              <label htmlFor="dontShowTutorial">Don't show this again</label>
+              <label htmlFor="dontShowTutorial" style={{ fontSize: "11px" }}>
+                Don't show this again
+              </label>
             </div>
             <button
               onClick={() => setShowTutorial(false)}
@@ -577,7 +632,13 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
               style={styles.notificationModal}
               className="notification-modal"
             >
-              <h3 style={{ marginBottom: "20px", fontWeight: "bold" }}>
+              <h3
+                style={{
+                  marginBottom: "12px",
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                }}
+              >
                 Notification
               </h3>
               <div style={styles.tutorialContent}>{notification.message}</div>
@@ -592,37 +653,28 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
         ))}
       <nav style={styles.normalModeNav} className="normalmodenav">
         <div className="nav-brand">
-          <img
-            src="/trackerLogo.png"
-            alt="Logo"
-            style={{ width: "30px" }}
-            loading="lazy"
-          />
-          <span style={{ fontSize: "16px", marginLeft: "10px" }}>
-            Weekly Mode
-          </span>
+          <img src="/trackerLogo.png" alt="Logo" style={styles.navLogo} />
+          <span style={styles.navTitle}>Weekly Mode</span>
         </div>
-        <div className="nav-links">
+        <div style={styles.navLinks} className="nav-links">
           <Link to="/dashboard" className="nav-link">
-            <i className="bi bi-house-fill"></i> Dashboard
+            <i className="bi bi-house-fill"></i>
+          </Link>
+          <Link to="/normal-mode" className="nav-link">
+            <i className="bi bi-star-fill"></i>
           </Link>
           <Link to="/statistics" className="nav-link">
-            <i className="bi bi-bar-chart-fill"></i> Statistics
+            <i className="bi bi-bar-chart-fill"></i>
           </Link>
           <Link to="/gamepage" className="nav-link">
-            <i className="bi bi-dice-6-fill"></i> Game
+            <i className="bi bi-dice-6-fill"></i>
           </Link>
-          {auth.currentUser?.email === "admin@gmail.com" && (
-            <Link to="/adminpage" className="nav-link">
-              <i className="bi bi-gear-fill"></i> Admin Panel
-            </Link>
-          )}
           <button
             onClick={toggleAchievements}
+            style={{ padding: "2px 4px", minWidth: "44px", minHeight: "44px" }}
             className="nav-link"
-            id="achievements-button"
           >
-            <i className="bi bi-trophy-fill"></i> Achievements
+            <i className="bi bi-trophy-fill"></i>
           </button>
           <button
             onClick={handleSwitchToDaily}
@@ -630,96 +682,96 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
             className="nav-link switch-button"
             title="Switch to Daily Mode"
           >
-            <i className="bi bi-arrow-repeat me-2"></i>
-            Daily Mode
+            <i className="bi bi-arrow-repeat me-1"></i>
+            Daily
           </button>
-          <button onClick={handleLogout} className="nav-logout">
-            <i className="bi bi-box-arrow-right"></i> Logout
+          <button
+            onClick={handleLogout}
+            style={styles.navLogout}
+            className="nav-logout"
+          >
+            <i className="bi bi-box-arrow-right"></i>
           </button>
         </div>
       </nav>
-      <div
-        style={styles.dashboardContent}
-        className="col p-4 dashboard-content"
-      >
+      <div style={styles.dashboardContent} className="dashboard-content">
         {isLoading ? (
-          <div style={{ textAlign: "center", padding: "40px 0" }}>
+          <div style={{ textAlign: "center", padding: "32px 0" }}>
             <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Syncing...</span>
+              <span className="visually-hidden">Loading...</span>
             </div>
-            <p style={{ marginTop: "10px" }}>Syncing with server...</p>
+            <p style={styles.loadingText}>Loading tasks...</p>
           </div>
         ) : (
           <>
-            <div
-              style={styles.profileSection}
-              className="row mb-4 profile-section"
-            >
-              <div className="col-12 col-md-6">
+            <div className="row mb-2">
+              <div className="col-12 mb-2">
                 <div
                   style={styles.dashboardCard}
-                  className="card shadow-sm dashboard-card"
+                  className="card dashboard-card"
                 >
                   <div
                     style={styles.cardBody}
-                    className="text-center p-3 d-flex align-items-center justify-content-center card-body"
+                    className="text-center p-2 card-body"
                   >
-                    <div>
-                      <h4 style={{ fontWeight: "bold", marginBottom: "5px" }}>
-                        {userData.profile.name}
-                      </h4>
-                      <p style={{ fontSize: "12px", color: "#6c757d" }}>
-                        User ID: {userData?.uid?.slice(0, 8)}...
-                      </p>
-                      <div style={{ marginTop: "10px" }}>
-                        <span style={{ marginRight: "15px" }}>
-                          <i
-                            className="bi bi-star-fill"
-                            style={{ color: "#cd7f32", fontSize: "20px" }}
-                          ></i>{" "}
-                          {
-                            Object.values(userData.achievements).filter(
-                              (a) => a.star === "bronze"
-                            ).length
-                          }
-                        </span>
-                        <span style={{ marginRight: "15px" }}>
-                          <i
-                            className="bi bi-star-fill"
-                            style={{ color: "#c0c0c0", fontSize: "20px" }}
-                          ></i>{" "}
-                          {
-                            Object.values(userData.achievements).filter(
-                              (a) => a.star === "silver"
-                            ).length
-                          }
-                        </span>
-                        <span>
-                          <i
-                            className="bi bi-star-fill"
-                            style={{ color: "#ffd700", fontSize: "20px" }}
-                          ></i>{" "}
-                          {
-                            Object.values(userData.achievements).filter(
-                              (a) => a.star === "gold"
-                            ).length
-                          }
-                        </span>
-                      </div>
+                    <h4
+                      style={{
+                        color: "#343a40",
+                        fontWeight: "bold",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      {userData.profile.name}
+                    </h4>
+                    <p style={styles.userId}>
+                      User ID: {auth.currentUser?.uid?.slice(0, 8)}...
+                    </p>
+                    <div style={{ marginTop: "4px" }}>
+                      <span style={{ marginRight: "8px" }}>
+                        <i
+                          className="bi bi-star-fill"
+                          style={styles.bronzeStar}
+                        ></i>{" "}
+                        {
+                          Object.values(userData.achievements).filter(
+                            (a) => a.star === "bronze"
+                          ).length
+                        }
+                      </span>
+                      <span style={{ marginRight: "8px" }}>
+                        <i
+                          className="bi bi-star-fill"
+                          style={styles.silverStar}
+                        ></i>{" "}
+                        {
+                          Object.values(userData.achievements).filter(
+                            (a) => a.star === "silver"
+                          ).length
+                        }
+                      </span>
+                      <span>
+                        <i
+                          className="bi bi-star-fill"
+                          style={styles.goldStar}
+                        ></i>{" "}
+                        {
+                          Object.values(userData.achievements).filter(
+                            (a) => a.star === "gold"
+                          ).length
+                        }
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <div className="row mb-4">
-              <div className="col-12 col-md-4 mb-3">
+              <div className="col-12 mb-2">
                 <div
                   style={styles.dashboardCard}
-                  className="card shadow-sm dashboard-card"
+                  className="card dashboard-card"
                 >
                   <div
                     style={styles.cardBody}
-                    className="p-3 text-center card-body"
+                    className="p-2 text-center card-body"
                   >
                     <h6 style={styles.cardTitle}>Points Progress</h6>
                     <div style={styles.pointsProgress}>
@@ -734,14 +786,14 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                         }}
                       />
                       <p style={styles.progressText}>
-                        {userData.points.current} / {userData.points.total} pts
+                        {userData.points.current}/{userData.points.total}
                       </p>
                       <div
                         style={{
                           display: "flex",
                           justifyContent: "center",
-                          gap: "10px",
-                          marginTop: "10px",
+                          gap: "8px",
+                          marginTop: "4px",
                         }}
                       >
                         <button
@@ -757,25 +809,27 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                           −5pts
                         </button>
                       </div>
-                      <button
-                        onClick={resetPointsBar}
-                        style={{ marginTop: "10px", width: "100%" }}
-                        className="btn btn-warning"
-                      >
-                        Reset Points
-                      </button>
+                      <div style={{ width: "100%", marginTop: "4px" }}>
+                        <button
+                          onClick={resetPointsBar}
+                          style={{ width: "100%" }}
+                          className="btn btn-warning btn-sm"
+                        >
+                          Reset
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="col-12 col-md-4">
+              <div className="col-12 mb-2">
                 <div
                   style={styles.dashboardCard}
-                  className="card shadow-sm dashboard-card"
+                  className="card dashboard-card"
                 >
                   <div
                     style={styles.cardBody}
-                    className="p-3 text-center card-body"
+                    className="p-2 text-center card-body"
                   >
                     <h6 style={styles.cardTitle}>Monthly Points Progress</h6>
                     <div style={styles.monthlyPointsProgress}>
@@ -790,15 +844,14 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                         }}
                       />
                       <p style={styles.progressText}>
-                        {userData.Mpoints.current} / {userData.Mpoints.total}{" "}
-                        pts
+                        {userData.Mpoints.current}/{userData.Mpoints.total}
                       </p>
                       <div
                         style={{
                           display: "flex",
                           justifyContent: "center",
-                          gap: "10px",
-                          marginTop: "10px",
+                          gap: "8px",
+                          marginTop: "4px",
                         }}
                       >
                         <button
@@ -814,26 +867,28 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                           −5pts
                         </button>
                       </div>
-                      <button
-                        onClick={resetMonthlyPointsBar}
-                        style={{ marginTop: "10px", width: "100%" }}
-                        className="btn btn-warning"
-                      >
-                        Reset Monthly Points
-                      </button>
+                      <div style={{ width: "100%", marginTop: "4px" }}>
+                        <button
+                          onClick={resetMonthlyPointsBar}
+                          style={{ width: "100%" }}
+                          className="btn btn-warning btn-sm"
+                        >
+                          Reset
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="row mb-4" id="apply-boost">
+            <div className="row mb-2">
               <div className="col-12">
                 <div
                   style={styles.dashboardCard}
-                  className="card shadow-sm dashboard-card"
+                  className="card dashboard-card"
                 >
-                  <div style={{ padding: "12px" }}>
-                    <h6 style={styles.applyBoostTitle}>Apply a Boost</h6>
+                  <div style={styles.cardBody}>
+                    <h6 style={styles.applyBoostTitle}>Apply Boost</h6>
                     <div
                       style={{
                         display: "flex",
@@ -845,88 +900,72 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                         value={selectedTaskIndex}
                         onChange={(e) => setSelectedTaskIndex(e.target.value)}
                         style={styles.formSelectSm}
-                        className="me-2 mb-2 form-select-sm"
+                        className="mb-2 me-2 form-select-sm"
                       >
-                        <option value="">Select a Task</option>
-                        {userData.tasks.map(
-                          (task, originalIndex) =>
-                            task.category === "Task" && (
-                              <option key={originalIndex} value={originalIndex}>
-                                {task.name}{" "}
-                                {task.boost ? `(${task.boost})` : ""}
-                              </option>
-                            )
-                        )}
+                        <option value="">Select Task</option>
+                        {userData.tasks.map((task, index) => (
+                          <option key={index} value={index}>
+                            {task.name} {task.boost ? `(${task.boost})` : ""}
+                          </option>
+                        ))}
                       </select>
                       <select
                         value={selectedBoost}
                         onChange={(e) => setSelectedBoost(e.target.value)}
                         style={styles.formSelectSm}
-                        className="me-2 mb-2 form-select-sm"
+                        className="mb-2 me-2 form-select-sm"
                       >
-                        <option value="">Select a Boost</option>
+                        <option value="">Select Boost</option>
                         {Object.entries({
-                          DoubleEverything: {
-                            description: "Jackpot : Double Points",
-                          },
+                          DoubleEverything: { description: "Doubles Points" },
                           "+30Percent": {
-                            description:
-                              "The Investor : Increases Points by 30%",
+                            description: "Increases Points by 30%",
                           },
-                          TheSavior: {
-                            description: "The Savior : Multiple completions",
-                          },
-                          DoubleOrDie: {
-                            description: "العذاب المعسول :Double or -10",
-                          },
+                          TheSavior: { description: "Multiple completions" },
+                          DoubleOrDie: { description: "Double or -10" },
                           PerfectBonus: { description: "50 point bonus" },
                         }).map(([key, boost]) => (
                           <option key={key} value={key}>
-                            {boost.description}
+                            {key} - {boost.description}
                           </option>
                         ))}
                       </select>
                       <button
                         onClick={applyBoost}
-                        style={{ marginBottom: "10px" }}
-                        className="btn btn-primary"
+                        style={{ marginBottom: "8px" }}
+                        className="btn btn-primary btn-sm"
                       >
-                        Apply Boost
+                        Apply
                       </button>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="row mb-4 justify-content-center" id="start-buttons">
+            <div className="row mb-2">
               <div
                 style={{
                   display: "flex",
-                  gap: "15px",
                   justifyContent: "center",
+                  flexWrap: "wrap",
+                  gap: "8px",
                 }}
               >
                 <button
                   onClick={startTheWeek}
                   style={styles.startWeekButton}
                   className="btn start-week-button"
-                  title="Start this week's tasks"
                 >
-                  <i className="bi bi-calendar-week me-2"></i>
-                  Start This Week
+                  <i className="bi bi-calendar-week me-1"></i>
+                  Start Week
                 </button>
                 <button
                   onClick={handleSaveProgress}
-                  style={{
-                    ...styles.saveProgressButton,
-                    ...(isSyncing ? styles.saveProgressButtonSaving : {}),
-                  }}
+                  style={styles.saveProgressButton}
                   className="btn save-progress-button"
-                  title="Save your current progress"
-                  disabled={isSyncing}
                 >
-                  <i className="bi bi-save-fill me-2"></i>
-                  {isSyncing ? "Saving..." : "Save Your Progress"}
+                  <i className="bi bi-save me-1"></i>
+                  Save Progress
                 </button>
                 {auth.currentUser?.email !== "admin@gmail.com" && (
                   <button
@@ -935,18 +974,17 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                     className="btn feedback-button"
                     title="Share your feedback"
                   >
-                    <i className="bi bi-chat-text-fill me-2"></i>
-                    Give Feedback
+                    <i className="bi bi-chat-text-fill me-1"></i>
+                    Feedback
                   </button>
                 )}
               </div>
             </div>
-            <div className="row">
-              <div className="col-12 col-md-6 mb-3">
+            <div className="row mobile-column">
+              <div className="col-12 mb-2">
                 <div
                   style={styles.dashboardCard}
-                  className="card shadow-sm h-100 dashboard-card"
-                  id="tasks"
+                  className="card dashboard-card"
                 >
                   <div style={styles.cardBody} className="card-body">
                     <h6 style={styles.cardTitle}>Tasks</h6>
@@ -958,11 +996,11 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                               <button
                                 className={`accordion-button ${
                                   !openSections[category] ? "collapsed" : ""
-                                } text-dark`}
+                                }`}
                                 onClick={() => toggleSection(category)}
                                 aria-expanded={openSections[category]}
                               >
-                                {category} ({categoryTasks.length} tasks)
+                                {category} ({categoryTasks.length})
                               </button>
                             </h2>
                             <div
@@ -993,41 +1031,54 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                                         <li
                                           key={taskIndex}
                                           style={styles.listGroupItem}
-                                          className="list-group-item d-flex justify-content-between align-items-center py-1 position-relative task-list-item"
+                                          className="list-group-item d-flex flex-column py-1 position-relative task-list-item"
                                           id={`task-${originalIndex}`}
                                         >
                                           <div
                                             style={{
                                               display: "flex",
+                                              justifyContent: "space-between",
                                               alignItems: "center",
+                                              marginBottom: "4px",
                                             }}
                                           >
                                             <span style={{ color: "#dc3545" }}>
                                               {task.name}
                                             </span>
-                                            <i
-                                              className="bi bi-exclamation-circle-fill ms-2"
-                                              style={{
-                                                cursor: "pointer",
-                                                color: "#007bff",
-                                              }}
-                                              onClick={() =>
-                                                showTaskDescription(taskId)
-                                              }
-                                            ></i>
-                                            {task.boost && (
-                                              <span
+                                            <div>
+                                              <i
+                                                className="bi bi-exclamation-circle-fill"
                                                 style={{
-                                                  marginLeft: "5px",
-                                                  padding: "2px 5px",
-                                                  background: "#007bff",
-                                                  color: "white",
-                                                  borderRadius: "4px",
+                                                  cursor: "pointer",
+                                                  color: "#007bff",
                                                 }}
-                                              >
-                                                {task.boost}
-                                              </span>
-                                            )}
+                                                onClick={() =>
+                                                  showTaskDescription(taskId)
+                                                }
+                                              ></i>
+                                              {task.boost && (
+                                                <span
+                                                  style={{
+                                                    marginLeft: "4px",
+                                                    padding: "2px 4px",
+                                                    background: "#007bff",
+                                                    color: "black",
+                                                    borderRadius: "3px",
+                                                    fontSize: "10px",
+                                                  }}
+                                                >
+                                                  {task.boost}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              flexWrap: "wrap",
+                                              alignItems: "center",
+                                            }}
+                                          >
                                             {task.hasExceptionalOption && (
                                               <select
                                                 value={
@@ -1040,7 +1091,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                                                   )
                                                 }
                                                 style={styles.formSelectSm}
-                                                className="ms-2 form-select-sm"
+                                                className="me-1 mb-1 form-select-sm"
                                               >
                                                 <option value="normal">
                                                   Normal
@@ -1067,36 +1118,16 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                                                   )
                                                 }
                                                 style={styles.timesInput}
-                                                className="ms-2 times-input"
+                                                className="me-1 mb-1 times-input"
                                                 placeholder="Times"
                                               />
                                             )}
-                                            <br />
-                                            <small style={{ color: "#6c757d" }}>
-                                              ({task.points} Points{" "}
-                                              {task.penaltyPoints ||
-                                              task.penalty
-                                                ? ` / -${
-                                                    task.penaltyPoints ||
-                                                    task.penalty
-                                                  } Penalty`
-                                                : ""}
-                                              ) | Total: {task.completionCount}/
-                                              {task.numberLimit} | Lifetime:{" "}
-                                              {task.lifetimeCompletionCount}
-                                            </small>
-                                          </div>
-                                          <div
-                                            style={{
-                                              display: "flex",
-                                              alignItems: "center",
-                                            }}
-                                          >
                                             <button
                                               onClick={() =>
                                                 completeTask(originalIndex)
                                               }
-                                              className="btn btn-success btn-sm me-1"
+                                              style={{ margin: "0 4px 4px 0" }}
+                                              className="btn btn-success btn-sm"
                                             >
                                               Complete
                                             </button>
@@ -1106,7 +1137,8 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                                                   originalIndex
                                                 )
                                               }
-                                              className="btn btn-warning btn-sm me-1"
+                                              style={{ margin: "0 4px 4px 0" }}
+                                              className="btn btn-warning btn-sm"
                                             >
                                               Reset
                                             </button>
@@ -1115,9 +1147,10 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                                                 onClick={() =>
                                                   removeBoost(originalIndex)
                                                 }
-                                                className="btn btn-danger btn-sm me-1"
+                                                style={{ marginBottom: "4px" }}
+                                                className="btn btn-danger btn-sm"
                                               >
-                                                Remove Boost
+                                                Remove
                                               </button>
                                             )}
                                             {task.boost === "DoubleOrDie" && (
@@ -1125,7 +1158,8 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                                                 onClick={() =>
                                                   missTask(originalIndex)
                                                 }
-                                                className="btn btn-warning btn-sm me-1"
+                                                style={{ marginBottom: "4px" }}
+                                                className="btn btn-warning btn-sm"
                                               >
                                                 Miss
                                               </button>
@@ -1135,12 +1169,25 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                                                 onClick={() =>
                                                   claimBonus(originalIndex)
                                                 }
+                                                style={{ marginBottom: "4px" }}
                                                 className="btn btn-info btn-sm"
                                               >
                                                 Claim Bonus
                                               </button>
                                             )}
                                           </div>
+                                          <small style={styles.taskStats}>
+                                            ({task.points} Pts
+                                            {task.penaltyPoints || task.penalty
+                                              ? ` / -${
+                                                  task.penaltyPoints ||
+                                                  task.penalty
+                                                }`
+                                              : ""}{" "}
+                                            ) | Total: {task.completionCount}/
+                                            {task.numberLimit} | Lifetime:{" "}
+                                            {task.lifetimeCompletionCount}
+                                          </small>
                                           {notifications
                                             .filter(
                                               (n) =>
@@ -1166,12 +1213,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                                     })}
                                   </ul>
                                 ) : (
-                                  <p
-                                    style={{
-                                      fontSize: "12px",
-                                      color: "#6c757d",
-                                    }}
-                                  >
+                                  <p style={styles.noTasks}>
                                     No tasks in this category
                                   </p>
                                 )}
@@ -1184,10 +1226,10 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                   </div>
                 </div>
               </div>
-              <div className="col-12 col-md-6 mb-3">
+              <div className="col-12 mb-2">
                 <div
                   style={styles.dashboardCard}
-                  className="card shadow-sm h-100 dashboard-card"
+                  className="card dashboard-card"
                 >
                   <div style={styles.cardBody} className="card-body">
                     <h6 style={styles.cardTitle}>Weekly Completed Tasks</h6>
@@ -1214,7 +1256,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                                 {task.completionCount}x
                               </span>{" "}
                               {task.name}{" "}
-                              <small style={{ color: "#6c757d" }}>
+                              <small style={{ color: "black" }}>
                                 (Points: {task.points})
                               </small>
                             </span>
@@ -1231,7 +1273,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                       <p
                         style={{
                           textAlign: "center",
-                          fontSize: "12px",
+                          fontSize: "11px",
                           color: "#6c757d",
                         }}
                       >
@@ -1249,10 +1291,11 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
         <>
           <div style={styles.overlay} onClick={toggleAchievements}></div>
           <div style={styles.achievementsModal} className="achievements-modal">
-            <h5>Achievements</h5>
+            <h5 style={styles.achievementsTitle}>Achievements</h5>
             <button
               onClick={toggleAchievements}
-              className="btn btn-danger float-end"
+              style={{ fontSize: "10px" }}
+              className="btn btn-danger btn-sm float-end"
             >
               Close
             </button>
@@ -1274,7 +1317,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                           !openAchievementSections[category] ? "collapsed" : ""
                         }`}
                         onClick={() => toggleAchievementSection(category)}
-                        style={{ textDecoration: "none", color: "#000" }}
+                        style={{ fontSize: "11px", textDecoration: "none" }}
                       >
                         {category} ({achievements.length})
                       </button>
@@ -1305,15 +1348,14 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                             >
                               <div>
                                 <span
-                                  style={{
-                                    fontWeight: isEarned ? "bold" : "normal",
-                                    color: isEarned ? "#28a745" : "#000",
-                                  }}
+                                  style={
+                                    isEarned ? styles.earnedAchievement : {}
+                                  }
                                 >
                                   {achievement.name} - {achievement.description}
                                 </span>
                                 <br />
-                                <small>
+                                <small style={{ fontSize: "9px" }}>
                                   Progress: {progress}/{achievement.target}{" "}
                                   {isEarned
                                     ? `(Earned: ${new Date(
@@ -1326,7 +1368,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                               </div>
                               <i
                                 className="bi bi-star-fill"
-                                style={{ color: starColor, fontSize: "20px" }}
+                                style={{ color: starColor, fontSize: "12px" }}
                               ></i>
                             </li>
                           );
@@ -1344,4 +1386,4 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
   );
 };
 
-export default WeeklyMode;
+export default WeeklyModeMobile;

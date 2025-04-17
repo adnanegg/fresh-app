@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { auth, database } from "../firebase";
-import { signOut, deleteUser } from "firebase/auth";
+import {
+  signOut,
+  deleteUser,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+} from "firebase/auth";
 import { useNavigate, Link } from "react-router-dom";
 import { ref, get, update, remove } from "firebase/database";
 import Swal from "sweetalert2";
@@ -40,6 +45,7 @@ const Dashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(userProfile.name);
+  const [programLink, setProgramLink] = useState("/normal-mode");
 
   useEffect(() => {
     setScoreFormData((prev) => ({
@@ -247,6 +253,11 @@ const Dashboard = () => {
       });
     }
   }, [userId, pointsData, MpointsData]);
+
+  useEffect(() => {
+    const savedMode = localStorage.getItem("trackerMode") || "weekly";
+    setProgramLink(savedMode === "daily" ? "/normal-mode" : "/weekly-mode");
+  }, []);
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
@@ -472,18 +483,23 @@ const Dashboard = () => {
         cancelButtonColor: "#6c757d",
         confirmButtonText: "Yes, delete my account",
       });
+
       if (result.isConfirmed) {
         const user = auth.currentUser;
         if (!user || !userId) throw new Error("No user is currently logged in");
+
         Swal.fire({
           title: "Deleting Account...",
           allowOutsideClick: false,
           didOpen: () => Swal.showLoading(),
         });
+
         const userRef = ref(database, `users/${userId}`);
         await remove(userRef);
         await deleteUser(user);
         localStorage.removeItem(`userData_${userId}`);
+        localStorage.removeItem("trackerMode"); // Clear tracker mode as well
+
         await Swal.fire({
           icon: "success",
           title: "Account Deleted",
@@ -495,12 +511,79 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error("Account deletion error:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Deletion Failed",
-        text:
-          error.message || "Failed to delete your account. Please try again.",
-      });
+      if (error.code === "auth/requires-recent-login") {
+        // Prompt for re-authentication
+        const { value: credentials } = await Swal.fire({
+          title: "Re-authentication Required",
+          text: "Please enter your email and password to confirm account deletion.",
+          html:
+            '<input id="swal-input-email" class="swal2-input" placeholder="Email" type="email">' +
+            '<input id="swal-input-password" class="swal2-input" placeholder="Password" type="password">',
+          focusConfirm: false,
+          preConfirm: () => {
+            const email = document.getElementById("swal-input-email").value;
+            const password = document.getElementById(
+              "swal-input-password"
+            ).value;
+            if (!email || !password) {
+              Swal.showValidationMessage("Email and password are required");
+              return false;
+            }
+            return { email, password };
+          },
+          showCancelButton: true,
+          confirmButtonText: "Confirm",
+          cancelButtonText: "Cancel",
+        });
+
+        if (credentials) {
+          try {
+            // Re-authenticate user
+            const user = auth.currentUser;
+            const credential = EmailAuthProvider.credential(
+              credentials.email,
+              credentials.password
+            );
+            await reauthenticateWithCredential(user, credential);
+
+            // Retry deletion
+            Swal.fire({
+              title: "Deleting Account...",
+              allowOutsideClick: false,
+              didOpen: () => Swal.showLoading(),
+            });
+
+            const userRef = ref(database, `users/${userId}`);
+            await remove(userRef);
+            await deleteUser(user);
+            localStorage.removeItem(`userData_${userId}`);
+            localStorage.removeItem("trackerMode");
+
+            await Swal.fire({
+              icon: "success",
+              title: "Account Deleted",
+              text: "Your account has been successfully deleted.",
+              timer: 2000,
+              showConfirmButton: false,
+            });
+            navigate("/login");
+          } catch (reauthError) {
+            console.error("Re-authentication error:", reauthError);
+            Swal.fire({
+              icon: "error",
+              title: "Authentication Failed",
+              text: "Invalid email or password. Please try again.",
+            });
+          }
+        }
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Deletion Failed",
+          text:
+            error.message || "Failed to delete your account. Please try again.",
+        });
+      }
     }
   }, [userId, navigate]);
 
@@ -566,11 +649,29 @@ const Dashboard = () => {
       });
       return;
     }
-    const userRef = ref(database, `users/${userId}/profile`);
-    const updatedProfile = { name: tempName };
+
     try {
+      // Update localStorage first
+      const cachedUserData =
+        JSON.parse(localStorage.getItem(`userData_${userId}`)) || {};
+      const updatedCachedData = {
+        ...cachedUserData,
+        profile: { ...cachedUserData.profile, name: tempName },
+        lastUpdated: Date.now(),
+      };
+      localStorage.setItem(
+        `userData_${userId}`,
+        JSON.stringify(updatedCachedData)
+      );
+
+      // Update state to reflect change locally
+      setUserProfile({ name: tempName });
+
+      // Then update Firebase
+      const userRef = ref(database, `users/${userId}/profile`);
+      const updatedProfile = { name: tempName };
       await update(userRef, updatedProfile);
-      setUserProfile(updatedProfile);
+
       setIsEditingName(false);
       Swal.fire({
         icon: "success",
@@ -866,17 +967,8 @@ const Dashboard = () => {
             marginRight: "50px",
           }}
         >
-          <Link
-            to="/weekly-mode"
-            style={{
-              ...styles.topBarLink,
-              backgroundColor: "#28a745",
-              color: "#fff",
-              padding: "1px 12px",
-              borderRadius: "6px",
-            }}
-          >
-            Program
+          <Link to={programLink} className="nav-link">
+            <i className="bi bi-star-fill"></i> Program
           </Link>
         </div>
         <button
@@ -1066,7 +1158,7 @@ const Dashboard = () => {
           <div className="col-12 col-md-6 mb-3">
             <div style={styles.scoreFormCard} className="card shadow-sm">
               <div style={styles.cardBody} className="p-3">
-                <h3 style={styles.scoreFormTitle}>Stats</h3>
+                <h3 style={styles.scoreFormTitle}>Weekly Stats</h3>
                 <div>
                   <div className="row">
                     <div className="col-12 col-md-4 mb-3">

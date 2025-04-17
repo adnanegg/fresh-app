@@ -40,14 +40,26 @@ const STAR_TYPES = {
   Master: "gold",
 };
 
+// Tutorial content
+const normalTutorialMessages = [
+  'Click the "Start This Week" button to begin your weekly tasks.',
+  'Click the "Start Today" button to begin your daily tasks.',
+  "Remember to apply this week's boost.",
+  "Save your progress before you leave to keep your changes safe.",
+];
+
 export const useNormalModeLogic = (
   globalTasks,
   refreshGlobalTasks,
   initialMode = "daily"
 ) => {
   const navigate = useNavigate();
-  const [mode, setMode] = useState(initialMode);
+  const [mode, setMode] = useState(() => {
+    return localStorage.getItem("trackerMode") || initialMode;
+  });
   const [userId, setUserId] = useState(localStorage.getItem("userId"));
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const [userData, setUserData] = useState(() => {
     const storedData = localStorage.getItem(`userData_${userId}`);
     const parsedData = storedData ? JSON.parse(storedData) : {};
@@ -69,7 +81,7 @@ export const useNormalModeLogic = (
           cachedGlobalTasks[taskId]?.hasTimesOption ||
           false,
         selectedMode: parsedData.tasks[taskId]?.selectedMode || "normal",
-        bonusClaimed: parsedData.tasks[taskId]?.bonusClaimed || false, // New field to track bonus claim
+        bonusClaimed: parsedData.tasks[taskId]?.bonusClaimed || false,
       }));
     } else {
       initialTasks = Object.keys(cachedGlobalTasks).map((taskId) => ({
@@ -81,7 +93,7 @@ export const useNormalModeLogic = (
         boost: null,
         hasTimesOption: cachedGlobalTasks[taskId].hasTimesOption || false,
         selectedMode: "normal",
-        bonusClaimed: false, // Initialize bonusClaimed
+        bonusClaimed: false,
       }));
     }
 
@@ -185,6 +197,7 @@ export const useNormalModeLogic = (
           await update(ref(database, `users/${userId}`), {
             ...localData,
             tasks: tasksToSync,
+            preferences: { mode },
             lastUpdated: Date.now(),
           });
         }
@@ -240,7 +253,7 @@ export const useNormalModeLogic = (
               cachedGlobalTasks[taskId]?.hasTimesOption ||
               false,
             selectedMode: userTask.selectedMode || "normal",
-            bonusClaimed: userTask.bonusClaimed || false, // Initialize bonusClaimed
+            bonusClaimed: userTask.bonusClaimed || false,
           };
         });
 
@@ -261,6 +274,10 @@ export const useNormalModeLogic = (
           JSON.stringify(initialUserData)
         );
         setUserData(initialUserData);
+        if (firebaseData.preferences?.mode) {
+          setMode(firebaseData.preferences.mode);
+          localStorage.setItem("trackerMode", firebaseData.preferences.mode);
+        }
         setOpenSections(
           Object.keys(groupedTasks).reduce(
             (acc, category) => ({ ...acc, [category]: category === "Task" }),
@@ -394,9 +411,8 @@ export const useNormalModeLogic = (
       [index]: value === "" ? "" : Math.max(1, parseInt(value) || 1),
     }));
   }, []);
-
-  const BONUS_POINTS = 10; // Default bonus points
-  const PERFECT_BONUS_POINTS = 50; // Bonus points when PerfectBonus boost is applied
+  const BONUS_POINTS = 10;
+  const PERFECT_BONUS_POINTS = 50;
 
   const claimBonus = useCallback(
     async (index) => {
@@ -426,9 +442,7 @@ export const useNormalModeLogic = (
         return;
       }
 
-      // Determine bonus points based on whether PerfectBonus boost is applied
-      const bonusPoints =
-        task.boost === "PerfectBonus" ? PERFECT_BONUS_POINTS : BONUS_POINTS;
+      const bonusPoints = task.boost === "PerfectBonus" ? 50 : BONUS_POINTS;
 
       const result = await Swal.fire({
         title: "Claim Bonus?",
@@ -483,18 +497,17 @@ export const useNormalModeLogic = (
   const switchMode = useCallback(
     (newMode) => {
       setMode(newMode);
+      localStorage.setItem("trackerMode", newMode); // Save mode to localStorage
       navigate(newMode === "daily" ? "/normal-mode" : "/weekly-mode");
     },
     [navigate]
   );
-
   const completeTask = useCallback(
     (index) => {
       const task = userData.tasks[index];
       if (!task || typeof task.points !== "number") return;
 
       const times = task.hasTimesOption ? taskTimes[index] || 1 : 1;
-      // Skip dailyLimit check if "TheSavior" boost is applied
 
       if (
         mode === "daily" &&
@@ -654,13 +667,14 @@ export const useNormalModeLogic = (
     },
     [userData, taskTimes, updateLocalData, mode]
   );
+
   const undoTask = useCallback(
     (index) => {
       const task = userData.completedTasks[index];
       const taskIndex = userData.tasks.findIndex((t) => t.name === task.name);
       const originalTask = taskIndex !== -1 ? userData.tasks[taskIndex] : null;
 
-      if (!task || !originalTask) return; // Safety check
+      if (!task || !originalTask) return;
 
       const newCompletionCount = Math.max(task.completionCount - 1, 0);
       const newLifetimeCompletionCount = Math.max(
@@ -688,7 +702,7 @@ export const useNormalModeLogic = (
             : {}),
         };
       } else {
-        newCompletedTasks.splice(index, 1); // Remove from completedTasks if dailyCounter is 0
+        newCompletedTasks.splice(index, 1);
       }
 
       const newTasks = userData.tasks.map((t, i) =>
@@ -787,6 +801,7 @@ export const useNormalModeLogic = (
     },
     [userData.Mpoints, updateLocalData]
   );
+
   const resetTaskCompletionCount = useCallback(
     (index) => {
       const task = userData.tasks[index];
@@ -900,7 +915,7 @@ export const useNormalModeLogic = (
             dailyCounter: 0,
             boost: null,
             hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
-            bonusClaimed: false, // Reset bonusClaimed
+            bonusClaimed: false,
           };
           return acc;
         }, {}),
@@ -913,7 +928,7 @@ export const useNormalModeLogic = (
         dailyCounter: 0,
         boost: null,
         hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
-        bonusClaimed: false, // Reset bonusClaimed
+        bonusClaimed: false,
       }));
       updateLocalData({
         tasks: resetTasks,
@@ -960,7 +975,7 @@ export const useNormalModeLogic = (
     const resetTasks = userData.tasks.map((task) => ({
       ...task,
       dailyCounter: 0,
-      bonusClaimed: false, // Reset bonusClaimed daily
+      bonusClaimed: false,
     }));
     const resetCompletedTasks = userData.completedTasks.map((task) => ({
       ...task,
@@ -993,6 +1008,391 @@ export const useNormalModeLogic = (
     });
   }, [userData, updateLocalData]);
 
+  const applyGlobalBoost = useCallback(
+    async (taskId, boost) => {
+      if (!taskId || !boost || !BOOSTS[boost]) {
+        Swal.fire({
+          icon: "warning",
+          title: "Selection Required",
+          text: "Please select a valid task and boost.",
+        });
+        return;
+      }
+
+      const task = globalTasks[taskId];
+      if (!task) {
+        Swal.fire({
+          icon: "error",
+          title: "Invalid Task",
+          text: "The selected task is invalid.",
+        });
+        return;
+      }
+
+      const confirmResult = await Swal.fire({
+        icon: "warning",
+        title: "Apply Boost Globally?",
+        text: `Apply "${boost}" to "${task.name}" for all eligible users?`,
+        showCancelButton: true,
+        confirmButtonText: "Apply",
+      });
+
+      if (!confirmResult.isConfirmed) return;
+
+      try {
+        Swal.fire({
+          title: "Applying Boost...",
+          allowOutsideClick: false,
+          didOpen: () => Swal.showLoading(),
+        });
+
+        const usersRef = ref(database, "users");
+        const usersSnapshot = await get(usersRef);
+        const usersData = usersSnapshot.val() || {};
+
+        const updates = {};
+        for (const userId of Object.keys(usersData)) {
+          const userTasks = usersData[userId].tasks || {};
+          if (userTasks[taskId] && userTasks[taskId].boost !== boost) {
+            updates[`users/${userId}/tasks/${taskId}/boost`] = boost;
+            if (boost === "TheSavior") {
+              updates[`users/${userId}/tasks/${taskId}/hasTimesOption`] = true;
+            }
+          }
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await update(ref(database), updates);
+        }
+
+        const adminTaskIndex = userData.tasks.findIndex(
+          (t) => t.taskId === taskId
+        );
+        if (
+          adminTaskIndex !== -1 &&
+          userData.tasks[adminTaskIndex].boost !== boost
+        ) {
+          const updatedTasks = [...userData.tasks];
+          updatedTasks[adminTaskIndex] = {
+            ...updatedTasks[adminTaskIndex],
+            boost,
+            hasTimesOption:
+              boost === "TheSavior"
+                ? true
+                : updatedTasks[adminTaskIndex].hasTimesOption,
+          };
+          updateLocalData({ tasks: updatedTasks });
+        }
+
+        Swal.fire({
+          icon: "success",
+          title: "Boost Applied",
+          text: `"${boost}" applied to "${task.name}" for eligible users.`,
+          timer: 2000,
+        });
+      } catch (error) {
+        console.error("Global boost error:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Application Failed",
+          text: `Failed to apply boost: ${error.message}`,
+        });
+      }
+    },
+    [globalTasks, userData.tasks, updateLocalData]
+  );
+  const startWeekForAllUsers = useCallback(async () => {
+    const confirmResult = await Swal.fire({
+      icon: "warning",
+      title: "Start Week for All Users?",
+      text: "This will reset tasks, points, and boosts for all users, starting a new week. Historical completions will be archived. Continue?",
+      showCancelButton: true,
+      confirmButtonText: "Start Week",
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    try {
+      Swal.fire({
+        title: "Starting Week for All Users...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      const usersRef = ref(database, "users");
+      const usersSnapshot = await get(usersRef);
+      const usersData = usersSnapshot.val() || {};
+
+      const updates = {};
+      const weekNumber = (userData.currentWeek || 1) + 1;
+
+      for (const userId of Object.keys(usersData)) {
+        const user = usersData[userId];
+        const userTasks = user.tasks || {};
+        const completedTasks = Array.isArray(user.completedTasks)
+          ? user.completedTasks
+          : [];
+
+        // Archive historical completions
+        const weekArchive = completedTasks.reduce((acc, task) => {
+          acc[task.taskId] = task.completionCount || 0;
+          return acc;
+        }, {});
+        updates[`users/${userId}/historicalCompletions/${weekNumber}`] =
+          weekArchive;
+
+        // Reset tasks
+        const resetTasks = Object.fromEntries(
+          Object.keys(userTasks).map((taskId) => [
+            taskId,
+            {
+              ...userTasks[taskId],
+              completionCount: 0,
+              dailyCounter: 0,
+              boost: null,
+              hasTimesOption:
+                userTasks[taskId].hasTimesOption &&
+                userTasks[taskId].boost !== "TheSavior",
+              bonusClaimed: false,
+            },
+          ])
+        );
+
+        // Update user data
+        updates[`users/${userId}/tasks`] = resetTasks;
+        updates[`users/${userId}/completedTasks`] = [];
+        updates[`users/${userId}/points`] = { current: 0, total: 800 };
+        updates[`users/${userId}/currentWeek`] = weekNumber;
+      }
+
+      // Apply updates to Firebase
+      if (Object.keys(updates).length > 0) {
+        await update(ref(database), updates);
+      }
+
+      // Update admin's local state
+      const resetTasks = userData.tasks.map((task) => ({
+        ...task,
+        completionCount: 0,
+        dailyCounter: 0,
+        boost: null,
+        hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
+        bonusClaimed: false,
+      }));
+      updateLocalData({
+        tasks: resetTasks,
+        completedTasks: [],
+        points: { current: 0, total: 800 },
+        currentWeek: weekNumber,
+      });
+
+      Swal.fire({
+        icon: "success",
+        title: "Week Started",
+        text: `Week ${weekNumber} started for all users.`,
+        timer: 2000,
+      });
+    } catch (error) {
+      console.error("Start week for all users error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Operation Failed",
+        text: `Failed to start week: ${error.message}`,
+      });
+    }
+  }, [userData, updateLocalData]);
+
+  const sendGlobalNotification = useCallback(async () => {
+    const inputResult = await Swal.fire({
+      icon: "question",
+      title: "Send Global Notification",
+      text: "Enter the notification message to send to all users:",
+      input: "text",
+      inputPlaceholder: "e.g., Event tomorrow at 5 PM!",
+      showCancelButton: true,
+      confirmButtonText: "Send",
+      inputValidator: (value) => {
+        if (!value || value.trim().length === 0) {
+          return "Please enter a valid message";
+        }
+      },
+    });
+
+    if (!inputResult.isConfirmed) return;
+
+    const message = inputResult.value.trim();
+    const confirmResult = await Swal.fire({
+      icon: "warning",
+      title: "Confirm Notification",
+      text: `Send "${message}" to all users? It will appear as a notification modal.`,
+      showCancelButton: true,
+      confirmButtonText: "Send Notification",
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    try {
+      Swal.fire({
+        title: "Sending Notification...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      const notificationId = Date.now();
+      const notification = {
+        id: notificationId,
+        message,
+        timestamp: notificationId,
+        global: true,
+      };
+
+      // Store in global notifications path
+      await update(
+        ref(database, `notifications/global/${notificationId}`),
+        notification
+      );
+
+      // Update all users
+      const usersRef = ref(database, "users");
+      const usersSnapshot = await get(usersRef);
+      const usersData = usersSnapshot.val() || {};
+
+      const updates = {};
+      for (const userId of Object.keys(usersData)) {
+        updates[`users/${userId}/notifications/${notificationId}`] =
+          notification;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await update(ref(database), updates);
+      }
+
+      // Update admin's local notifications
+      setNotifications((prev) => [
+        ...prev,
+        {
+          id: notificationId,
+          message,
+          global: true,
+        },
+      ]);
+
+      Swal.fire({
+        icon: "success",
+        title: "Notification Sent",
+        text: `"${message}" sent to all users.`,
+        timer: 2000,
+      });
+    } catch (error) {
+      console.error("Send global notification error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Send Failed",
+        text: `Failed to send notification: ${error.message}`,
+      });
+    }
+  }, [setNotifications]);
+
+  const submitFeedback = useCallback(async () => {
+    if (auth.currentUser?.email === "admin@gmail.com") return;
+
+    const inputResult = await Swal.fire({
+      icon: "question",
+      title: "Submit Feedback",
+      text: "Share your suggestions, issues, or comments about the app:",
+      input: "textarea",
+      inputPlaceholder: "Type your feedback here...",
+      showCancelButton: true,
+      confirmButtonText: "Submit",
+      inputValidator: (value) => {
+        if (!value || value.trim().length === 0) {
+          return "Please enter a valid feedback message";
+        }
+      },
+    });
+
+    if (!inputResult.isConfirmed) return;
+
+    const message = inputResult.value.trim();
+    try {
+      Swal.fire({
+        title: "Submitting Feedback...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      const feedbackId = Date.now();
+      const feedback = {
+        userId: auth.currentUser.uid,
+        email: auth.currentUser.email,
+        timestamp: feedbackId,
+        message,
+      };
+
+      await update(ref(database, `feedback/${feedbackId}`), feedback);
+
+      Swal.fire({
+        icon: "success",
+        title: "Feedback Submitted",
+        text: "Thank you for your feedback!",
+        timer: 2000,
+      });
+    } catch (error) {
+      console.error("Submit feedback error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Submission Failed",
+        text: `Failed to submit feedback: ${error.message}`,
+      });
+    }
+  }, []);
+
+  const viewFeedback = useCallback(async () => {
+    try {
+      Swal.fire({
+        title: "Fetching Feedback...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      const feedbackRef = ref(database, "feedback");
+      const feedbackSnapshot = await get(feedbackRef);
+      const feedbackData = feedbackSnapshot.val() || {};
+
+      if (Object.keys(feedbackData).length === 0) {
+        Swal.fire({
+          icon: "info",
+          title: "No Feedback",
+          text: "No feedback has been submitted yet.",
+          confirmButtonText: "OK",
+        });
+        return;
+      }
+
+      const feedbackList = Object.entries(feedbackData)
+        .map(([id, feedback]) => {
+          const date = new Date(feedback.timestamp).toLocaleDateString();
+          return `<strong>From:</strong> ${feedback.email}<br><strong>Date:</strong> ${date}<br><strong>Message:</strong> ${feedback.message}<br><hr>`;
+        })
+        .join("");
+
+      Swal.fire({
+        icon: "info",
+        title: "User Feedback",
+        html: `<div style="text-align: left; max-height: 400px; overflow-y: auto;">${feedbackList}</div>`,
+        confirmButtonText: "Close",
+        width: "600px",
+      });
+    } catch (error) {
+      console.error("View feedback error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Failed to Load",
+        text: `Failed to load feedback: ${error.message}`,
+      });
+    }
+  }, []);
+
   const getProgressColor = (current, total) => {
     const percentage = (current / total) * 100;
     if (percentage >= 75) return "#28a745";
@@ -1001,12 +1401,16 @@ export const useNormalModeLogic = (
   };
 
   const toggleAchievements = () => setIsAchievementsOpen((prev) => !prev);
+  const removeNotification = (id) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
 
   return {
     userData,
     notifications,
     openSections,
     isLoading,
+    isSyncing,
     selectedTaskIndex,
     setSelectedTaskIndex,
     selectedBoost,
@@ -1021,6 +1425,7 @@ export const useNormalModeLogic = (
     applyBoost,
     removeBoost,
     handleTimesChange,
+    removeNotification,
     mode,
     switchMode,
     completeTask,
@@ -1041,5 +1446,11 @@ export const useNormalModeLogic = (
     claimBonus,
     adjustPoints,
     adjustMonthlyPoints,
+    normalTutorialMessages,
+    applyGlobalBoost,
+    startWeekForAllUsers,
+    sendGlobalNotification,
+    submitFeedback,
+    viewFeedback,
   };
 };
