@@ -24,13 +24,5 @@ yarn-error.log*
 
 .env
 
-DashboardJSONfile.json
 
-cd functions
 
-gcloud functions deploy submitScore \
-  --runtime nodejs20 \
-  --trigger-http \
-  --allow-unauthenticated \
-  --set-env-vars GOOGLE_SHEETS_CREDENTIALS="$(< ../DashboardJSONfile.json)",PROJECT_ID=dashboard-451923 \
-  --region europe-west1

@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { ref, get, update } from "firebase/database";
 import Swal from "sweetalert2";
 
-const BONUS_POINTS = 10;
 const BOOSTS = {
   DoubleEverything: {
     multiplier: 2,
@@ -40,23 +39,14 @@ const STAR_TYPES = {
   Master: "gold",
 };
 
-// Tutorial content
-const normalTutorialMessages = [
-  'Click the "Start This Week" button to begin your weekly tasks.',
-  'Click the "Start Today" button to begin your daily tasks.',
-  "Remember to apply this week's boost.",
-  "Save your progress before you leave to keep your changes safe.",
-];
-
 export const useNormalModeLogic = (
   globalTasks,
   refreshGlobalTasks,
   initialMode = "daily"
 ) => {
   const navigate = useNavigate();
-  const [mode, setMode] = useState(() => {
-    return localStorage.getItem("trackerMode") || initialMode;
-  });
+  const [mode, setMode] = useState(initialMode);
+
   const [userId, setUserId] = useState(localStorage.getItem("userId"));
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -81,6 +71,7 @@ export const useNormalModeLogic = (
           cachedGlobalTasks[taskId]?.hasTimesOption ||
           false,
         selectedMode: parsedData.tasks[taskId]?.selectedMode || "normal",
+
         bonusClaimed: parsedData.tasks[taskId]?.bonusClaimed || false,
       }));
     } else {
@@ -107,6 +98,7 @@ export const useNormalModeLogic = (
         : [],
       achievements: parsedData.achievements || {},
       lastUpdated: parsedData.lastUpdated || Date.now(),
+      isReady: parsedData.isReady || false,
     };
   });
   const [notifications, setNotifications] = useState([]);
@@ -118,6 +110,7 @@ export const useNormalModeLogic = (
   const [isCompletedTasksOpen, setIsCompletedTasksOpen] = useState(false);
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let timeoutId;
@@ -150,6 +143,14 @@ export const useNormalModeLogic = (
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [navigate, globalTasks, authInitialized]);
+
+  useEffect(() => {
+    if (userId) {
+      update(ref(database, `users/${userId}`), { isReady }).catch((error) =>
+        console.error("Failed to sync isReady:", error)
+      );
+    }
+  }, [isReady, userId]);
 
   const groupedTasks = useMemo(() => {
     if (!Array.isArray(userData.tasks)) return {};
@@ -197,8 +198,8 @@ export const useNormalModeLogic = (
           await update(ref(database, `users/${userId}`), {
             ...localData,
             tasks: tasksToSync,
-            preferences: { mode },
             lastUpdated: Date.now(),
+            isReady: userData.isReady,
           });
         }
       } catch (error) {
@@ -210,7 +211,7 @@ export const useNormalModeLogic = (
         throw error;
       }
     },
-    [userId, userData.lastUpdated]
+    [userId, userData.lastUpdated, userData.isReady]
   );
 
   useEffect(() => {
@@ -267,6 +268,9 @@ export const useNormalModeLogic = (
             : [],
           achievements: firebaseData.achievements || {},
           lastUpdated: firebaseData.lastUpdated || Date.now(),
+          isReady: firebaseData.isReady || false,
+          mode: firebaseData.preferences?.mode || "daily",
+          currentWeek: firebaseData.currentWeek || 1,
         };
 
         localStorage.setItem(
@@ -274,10 +278,7 @@ export const useNormalModeLogic = (
           JSON.stringify(initialUserData)
         );
         setUserData(initialUserData);
-        if (firebaseData.preferences?.mode) {
-          setMode(firebaseData.preferences.mode);
-          localStorage.setItem("trackerMode", firebaseData.preferences.mode);
-        }
+        setIsReady(initialUserData.isReady);
         setOpenSections(
           Object.keys(groupedTasks).reduce(
             (acc, category) => ({ ...acc, [category]: category === "Task" }),
@@ -412,7 +413,6 @@ export const useNormalModeLogic = (
     }));
   }, []);
   const BONUS_POINTS = 10;
-  const PERFECT_BONUS_POINTS = 50;
 
   const claimBonus = useCallback(
     async (index) => {
@@ -495,12 +495,23 @@ export const useNormalModeLogic = (
   );
 
   const switchMode = useCallback(
-    (newMode) => {
+    async (newMode) => {
       setMode(newMode);
-      localStorage.setItem("trackerMode", newMode); // Save mode to localStorage
+      try {
+        await update(ref(database, `users/${userId}/preferences`), {
+          mode: newMode,
+        });
+      } catch (error) {
+        console.error("Failed to update tracker mode in Firebase:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Mode Switch Failed",
+          text: "Failed to save mode to server. Mode saved locally.",
+        });
+      }
       navigate(newMode === "daily" ? "/normal-mode" : "/weekly-mode");
     },
-    [navigate]
+    [navigate, userId]
   );
   const completeTask = useCallback(
     (index) => {
@@ -887,41 +898,62 @@ export const useNormalModeLogic = (
   }, [navigate, syncWithFirebase, userId]);
 
   const startTheWeek = useCallback(async () => {
+    if (!userId) {
+      Swal.fire({
+        icon: "error",
+        title: "User Not Found",
+        text: "User ID is missing. Please log in again.",
+      });
+      navigate("/login");
+      return;
+    }
+
+    // Fetch the latest currentWeek from Firebase to avoid stale data
+    let currentWeek;
+    try {
+      const weekSnap = await get(ref(database, `users/${userId}/currentWeek`));
+      currentWeek = weekSnap.val() || 1;
+    } catch (error) {
+      console.error("Failed to fetch currentWeek:", error);
+      currentWeek = userData.currentWeek || 1;
+    }
+
+    const newWeekNumber = currentWeek + 1;
     const weekArchive = {
       timestamp: Date.now(),
-      weekNumber: userData.currentWeek || 1,
+      weekNumber: currentWeek,
       completedTasks: [...userData.completedTasks],
       points: userData.points.current,
       Mpoints: userData.Mpoints.current,
     };
 
     try {
-      await update(ref(database, `users/${userId}/historicalCompletions`), {
-        [weekArchive.weekNumber]: weekArchive.completedTasks.reduce(
-          (acc, task) => {
-            acc[task.taskId] = task.completionCount;
-            return acc;
-          },
-          {}
-        ),
-      });
-      await update(ref(database, `users/${userId}`), {
-        currentWeek: (userData.currentWeek || 1) + 1,
-        completedTasks: [],
-        tasks: userData.tasks.reduce((acc, task) => {
-          acc[task.taskId] = {
-            ...task,
-            completionCount: 0,
-            dailyCounter: 0,
-            boost: null,
-            hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
-            bonusClaimed: false,
-          };
+      // Perform all Firebase updates in a single transaction
+      const updates = {};
+      updates[`users/${userId}/historicalCompletions/${currentWeek}`] =
+        weekArchive.completedTasks.reduce((acc, task) => {
+          acc[task.taskId] = task.completionCount || 0;
           return acc;
-        }, {}),
-        points: { current: 0, total: 800 },
-      });
+        }, {});
+      updates[`users/${userId}/currentWeek`] = newWeekNumber;
+      updates[`users/${userId}/completedTasks`] = [];
+      updates[`users/${userId}/tasks`] = userData.tasks.reduce((acc, task) => {
+        acc[task.taskId] = {
+          ...task,
+          completionCount: 0,
+          dailyCounter: 0,
+          boost: null,
+          hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
+          bonusClaimed: false,
+        };
+        return acc;
+      }, {});
+      updates[`users/${userId}/points`] = { current: 0, total: 800 };
+      updates[`users/${userId}/isReady`] = false;
 
+      await update(ref(database), updates);
+
+      // Update local state
       const resetTasks = userData.tasks.map((task) => ({
         ...task,
         completionCount: 0,
@@ -934,28 +966,36 @@ export const useNormalModeLogic = (
         tasks: resetTasks,
         completedTasks: [],
         points: { current: 0, total: 800 },
-        currentWeek: (userData.currentWeek || 1) + 1,
+        currentWeek: newWeekNumber,
+        isReady: false,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Trigger stats refresh
       localStorage.setItem("statsRefreshTimestamp", Date.now().toString());
+
+      // Debugging: Log the transition
+      console.log({
+        message: `Started week ${newWeekNumber}`,
+        userId,
+        previousWeek: currentWeek,
+        completedTasksCount: userData.completedTasks.length,
+        archivedTasks: weekArchive.completedTasks,
+      });
 
       Swal.fire({
         icon: "success",
         title: "New Week Started!",
-        html: `<div><p>All counters and boosts reset. Week ${
-          (userData.currentWeek || 1) + 1
-        } started.</p><small>Previous week's data archived for statistics.</small></div>`,
+        html: `<div><p>All counters and boosts reset. Week ${newWeekNumber} started.</p><small>Previous week's data archived for statistics.</small></div>`,
       });
     } catch (error) {
-      console.error("Failed to archive week:", error);
+      console.error("Failed to start new week:", error);
       Swal.fire({
         icon: "error",
         title: "Week Start Failed",
-        text: "Failed to start new week. Please try again.",
+        text: `Failed to start new week: ${error.message}. Your changes are saved locally.`,
       });
     }
-  }, [userData, updateLocalData, userId]);
+  }, [userData, updateLocalData, userId, navigate]);
 
   const startTheDay = useCallback(() => {
     const doubleOrDieTasks = userData.tasks.filter(
@@ -1446,11 +1486,12 @@ export const useNormalModeLogic = (
     claimBonus,
     adjustPoints,
     adjustMonthlyPoints,
-    normalTutorialMessages,
     applyGlobalBoost,
     startWeekForAllUsers,
     sendGlobalNotification,
     submitFeedback,
     viewFeedback,
+    isReady,
+    setIsReady,
   };
 };

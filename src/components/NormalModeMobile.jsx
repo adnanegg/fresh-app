@@ -51,6 +51,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     viewFeedback,
     applyGlobalBoost,
     startWeekForAllUsers,
+    claimBonus,
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "daily");
 
   const [openAchievementSections, setOpenAchievementSections] = useState({});
@@ -98,7 +99,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
   useEffect(() => {
     const interval = setInterval(() => {
       syncWithFirebase(true);
-    }, 2000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [syncWithFirebase]);
 
@@ -446,7 +447,11 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     .apply-global-boost-button:hover, .apply-global-boost-button:active {
       transform: scale(1.05);
       background: linear-gradient(135deg, #a71d2a, #7a1a1f);
-    }  
+    }
+    .btn-info:hover {
+      transform: scale(1.05);
+      background: #138496;
+    }
   `;
 
   const toggleAchievementSection = (category) => {
@@ -481,50 +486,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       {isSyncing && (
         <div style={styles.syncOverlay}>Syncing, please wait...</div>
       )}
-      {showTutorial && (
-        <>
-          <div
-            style={styles.tutorialOverlay}
-            onClick={() => setShowTutorial(false)}
-          ></div>
-          <div style={styles.tutorialModal} className="tutorial-modal">
-            <h3 style={{ marginBottom: "20px", fontWeight: "bold" }}>
-              Welcome to Daily Mode
-            </h3>
-            <div style={styles.tutorialContent}>
-              <ul style={{ paddingLeft: "20px" }}>
-                {normalTutorialMessages.map((msg, index) => (
-                  <li key={index} style={{ marginBottom: "10px" }}>
-                    {msg}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                marginBottom: "20px",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={dontShowTutorial}
-                onChange={handleDontShowChange}
-                style={styles.tutorialCheckbox}
-                id="dontShowTutorial"
-              />
-              <label htmlFor="dontShowTutorial">Don't show this again</label>
-            </div>
-            <button
-              onClick={() => setShowTutorial(false)}
-              style={styles.tutorialButton}
-            >
-              Got It!
-            </button>
-          </div>
-        </>
-      )}
+      
       {notifications
         .filter((n) => n.global && !dismissedNotifications.includes(n.id))
         .map((notification) => (
@@ -1008,6 +970,11 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                         );
                                       const isCompleteDisabled =
                                         task.dailyCounter >= task.dailyLimit;
+                                      const isBonusClaimable =
+                                        task.completionCount >=
+                                          task.numberLimit &&
+                                        !task.bonusClaimed &&
+                                        task.category !== "Bonus";
                                       return (
                                         <li
                                           key={taskIndex}
@@ -1112,6 +1079,20 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                                 }}
                                               >
                                                 Remove
+                                              </button>
+                                            )}
+                                            {isBonusClaimable && (
+                                              <button
+                                                onClick={() =>
+                                                  claimBonus(originalIndex)
+                                                }
+                                                className="btn btn-info btn-sm mb-1"
+                                                style={{
+                                                  fontSize: "9px",
+                                                  minHeight: "30px",
+                                                }}
+                                              >
+                                                Claim Bonus
                                               </button>
                                             )}
                                           </div>

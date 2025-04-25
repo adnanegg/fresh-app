@@ -14,8 +14,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const userId = auth.currentUser?.uid;
 
-  const [isVisible, setIsVisible] = useState(false);
   const [userProfile, setUserProfile] = useState({ name: "" });
+  const [readyUsersCount, setReadyUsersCount] = useState(0);
   const [pointsData, setPointsData] = useState({ current: 0, total: 800 });
   const [MpointsData, setMpointsData] = useState({ current: 0, total: 2800 });
   const [achievementsData, setAchievementsData] = useState({});
@@ -85,6 +85,7 @@ const Dashboard = () => {
         achievementsSnap,
         tasksSnap,
         globalTasksSnap,
+        usersSnap,
       ] = await Promise.all([
         get(ref(database, `users/${userId}/profile`)),
         get(ref(database, `users/${userId}/points`)),
@@ -92,6 +93,7 @@ const Dashboard = () => {
         get(ref(database, `users/${userId}/achievements`)),
         get(ref(database, `users/${userId}/tasks`)),
         get(ref(database, "globalTasks")),
+        get(ref(database, "users")),
       ]);
 
       const firebaseData = {
@@ -105,10 +107,19 @@ const Dashboard = () => {
 
       const globalTasks = globalTasksSnap.val() || {};
 
+      let readyCount = 0;
+      if (auth.currentUser?.email === "admin@gmail.com") {
+        const users = usersSnap.val() || {};
+        readyCount = Object.values(users).filter(
+          (user) => user.isReady === true
+        ).length;
+      }
+
       setUserProfile(firebaseData.profile);
       setPointsData(firebaseData.points);
       setMpointsData(firebaseData.Mpoints);
       setAchievementsData(firebaseData.achievements);
+      setReadyUsersCount(readyCount); // Set ready users count for admin
 
       const taskPercentages = [
         "book_read",
@@ -255,9 +266,24 @@ const Dashboard = () => {
   }, [userId, pointsData, MpointsData]);
 
   useEffect(() => {
-    const savedMode = localStorage.getItem("trackerMode") || "weekly";
-    setProgramLink(savedMode === "daily" ? "/normal-mode" : "/weekly-mode");
-  }, []);
+    const fetchTrackerMode = async () => {
+      try {
+        const modeSnap = await get(
+          ref(database, `users/${userId}/preferences/mode`)
+        );
+        const trackerMode = modeSnap.val() || "weekly"; // Default to weekly if not set
+        setProgramLink(
+          trackerMode === "daily" ? "/normal-mode" : "/weekly-mode"
+        );
+      } catch (error) {
+        console.error("Failed to fetch tracker mode:", error);
+        setProgramLink("/weekly-mode"); // Fallback to weekly on error
+      }
+    };
+    if (userId) {
+      fetchTrackerMode();
+    }
+  }, [userId]);
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
@@ -923,6 +949,16 @@ const Dashboard = () => {
       borderRadius: "4px",
       cursor: "pointer",
     },
+    readyUsersCard: {
+      textAlign: "center",
+      padding: "15px",
+      borderRadius: "8px",
+      background: "linear-gradient(135deg, #28a745, #007bff)", // Green to blue gradient
+      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+      transition: "background 0.3s ease, transform 0.3s ease",
+      position: "relative",
+      overflow: "hidden",
+    },
   };
 
   const stylesString = `
@@ -970,6 +1006,11 @@ const Dashboard = () => {
           <Link to={programLink} className="nav-link">
             <i className="bi bi-star-fill"></i> Program
           </Link>
+          {isAdmin && (
+            <Link to="/admin-scores" className="nav-link">
+              <i className="bi bi-bar-chart-fill"></i> Admin Scores
+            </Link>
+          )}
         </div>
         <button
           style={styles.hamburgerMenu}
@@ -998,6 +1039,12 @@ const Dashboard = () => {
           <i className="bi bi-bar-chart-fill" style={styles.navIcon}></i>{" "}
           Statistics
         </Link>
+        {isAdmin && (
+          <Link to="/admin-scores" style={styles.mobileNavLink}>
+            <i className="bi bi-bar-chart-fill" style={styles.navIcon}></i>{" "}
+            Admin Scores
+          </Link>
+        )}
         <button onClick={handleLogout} style={styles.logoutButton}>
           <i className="bi bi-box-arrow-right" style={styles.navIcon}></i>{" "}
           Logout
@@ -1007,6 +1054,29 @@ const Dashboard = () => {
       <div style={styles.dashboardContent} className="container-fluid">
         {isAdmin && (
           <div className="mb-4">
+            <div style={styles.dashboardCard} className="card shadow-sm mb-3">
+              <div style={styles.cardBody} className="p-3 text-center">
+                <h6
+                  style={styles.cardTitle}
+                  className="card-title text-primary mb-2"
+                >
+                  Ready Users
+                </h6>
+                <div style={styles.pointsProgress}>
+                  <i
+                    className="bi bi-check-circle-fill"
+                    style={{
+                      ...styles.progressIcon,
+                      color: "#28a745",
+                    }}
+                  />
+                  <p style={styles.progressText}>
+                    {readyUsersCount} User{readyUsersCount !== 1 ? "s" : ""}{" "}
+                    Ready
+                  </p>
+                </div>
+              </div>
+            </div>
             <button
               onClick={submitAllUserForms}
               className="btn btn-danger w-100 mb-2"
@@ -1023,63 +1093,6 @@ const Dashboard = () => {
             </button>
           </div>
         )}
-        <div className="row mb-4">
-          <div className="col-12 col-md-6 mb-3 mb-md-0">
-            <div style={styles.dashboardCard} className="card shadow-sm">
-              <div style={styles.cardBody} className="text-center p-3">
-                {isEditingName ? (
-                  <div>
-                    <input
-                      type="text"
-                      value={tempName}
-                      onChange={(e) => setTempName(e.target.value)}
-                      style={styles.nameEditInput}
-                    />
-                    <button
-                      onClick={handleNameChange}
-                      style={styles.nameEditButton}
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsEditingName(false);
-                        setTempName(userProfile.name);
-                      }}
-                      style={styles.nameCancelButton}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <h4
-                      style={styles.cardTitle}
-                      className="text-dark fw-bold mb-1"
-                    >
-                      {userProfile.name}
-                    </h4>
-                    <button
-                      onClick={() => setIsEditingName(true)}
-                      className="btn btn-sm btn-outline-primary mt-2"
-                    >
-                      Edit Name
-                    </button>
-                    <button
-                      onClick={handleDeleteAccount}
-                      className="btn btn-sm btn-outline-danger mt-2 mx-2"
-                    >
-                      <i className="bi bi-trash-fill me-1"></i>Delete Account
-                    </button>
-                  </>
-                )}
-                <p className="text-muted small">
-                  User ID: {auth.currentUser?.uid?.slice(0, 8)}...
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <div className="row mb-4">
           <div className="col-12 col-md-4 mb-3 mb-md-0">

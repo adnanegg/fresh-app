@@ -16,6 +16,7 @@ import AdminPage from "./components/AdminPage";
 import Signup from "./components/Signup";
 import NormalModeContainer from "./components/NormalModeContainer";
 import WeeklyModeContainer from "./components/WeeklyModeContainer";
+import AdminScorePage from "./components/AdminScorePage";
 
 const PrivateRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
@@ -49,6 +50,14 @@ function App() {
           element={
             <PrivateRoute>
               <Dashboard />
+            </PrivateRoute>
+          }
+        />
+         <Route
+          path="/admin-scores"
+          element={
+            <PrivateRoute>
+              <AdminScorePage />
             </PrivateRoute>
           }
         />

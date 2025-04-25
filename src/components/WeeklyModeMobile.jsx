@@ -34,7 +34,6 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     getProgressColor,
     isAchievementsOpen,
     toggleAchievements,
-    refreshGlobalTasks: refreshGlobalTasksFromLogic,
     claimBonus,
     adjustPoints,
     adjustMonthlyPoints,
@@ -89,11 +88,11 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     localStorage.setItem("dontShowTutorial", checked);
   };
 
-  // Sync every 5 seconds
+  // Sync every 10 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       syncWithFirebase(true);
-    }, 2000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [syncWithFirebase]);
 
@@ -567,58 +566,6 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
             Syncing, please wait...
           </div>
         </div>
-      )}
-      {showTutorial && (
-        <>
-          <div
-            style={styles.tutorialOverlay}
-            onClick={() => setShowTutorial(false)}
-          ></div>
-          <div style={styles.tutorialModal} className="tutorial-modal">
-            <h3
-              style={{
-                marginBottom: "12px",
-                fontWeight: "bold",
-                fontSize: "14px",
-              }}
-            >
-              Welcome to Weekly Mode
-            </h3>
-            <div style={styles.tutorialContent}>
-              <ul style={{ paddingLeft: "16px" }}>
-                {tutorialMessages.map((msg, index) => (
-                  <li key={index} style={{ marginBottom: "8px" }}>
-                    {msg}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                marginBottom: "12px",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={dontShowTutorial}
-                onChange={handleDontShowChange}
-                style={styles.tutorialCheckbox}
-                id="dontShowTutorial"
-              />
-              <label htmlFor="dontShowTutorial" style={{ fontSize: "11px" }}>
-                Don't show this again
-              </label>
-            </div>
-            <button
-              onClick={() => setShowTutorial(false)}
-              style={styles.tutorialButton}
-            >
-              Got It!
-            </button>
-          </div>
-        </>
       )}
       {notifications
         .filter((n) => n.global && !dismissedNotifications.includes(n.id))

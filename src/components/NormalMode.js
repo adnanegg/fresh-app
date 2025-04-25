@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { auth } from "../firebase";
 import { useNormalModeLogic } from "./NormalModeLogic";
 import "./styles/style.css";
@@ -8,7 +8,6 @@ import "bootstrap-icons/font/bootstrap-icons.css";
 import Swal from "sweetalert2";
 
 const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
-  const navigate = useNavigate();
   const {
     userData,
     notifications,
@@ -30,8 +29,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     completeTask,
     undoTask,
     resetTaskCompletionCount,
-    resetCompletedTasks,
-    resetAllTaskCompletionCount,
     resetPointsBar,
     resetMonthlyPointsBar,
     handleLogout,
@@ -40,66 +37,25 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     getProgressColor,
     isAchievementsOpen,
     toggleAchievements,
-    refreshGlobalTasks: refreshGlobalTasksFromLogic,
     claimBonus,
     adjustPoints,
     adjustMonthlyPoints,
     switchMode,
     syncWithFirebase,
-    normalTutorialMessages,
     applyGlobalBoost,
     startWeekForAllUsers,
     sendGlobalNotification,
     submitFeedback,
     viewFeedback,
+    isReady, 
+    setIsReady, 
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "weekly");
 
-  const [openAchievementSections, setOpenAchievementSections] = React.useState(
-    {}
-  );
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [dontShowTutorial, setDontShowTutorial] = useState(false);
+  const [openAchievementSections, setOpenAchievementSections] = React.useState({});
   const [adminSelectedTaskId, setAdminSelectedTaskId] = useState("");
   const [adminSelectedBoost, setAdminSelectedBoost] = useState("");
-  const [dismissedNotifications, setDismissedNotifications] = useState(() => {
-    return (
-      JSON.parse(
-        localStorage.getItem(`dismissedNotifications_${auth.currentUser?.uid}`)
-      ) || []
-    );
-  });
+  const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = useState(false);
 
-  const contentHash = JSON.stringify(normalTutorialMessages);
-
-  useEffect(() => {
-    const storedHash = localStorage.getItem("tutorialContentHash");
-    const storedDontShow = localStorage.getItem("dontShowTutorial") === "true";
-    if (storedHash !== contentHash) {
-      localStorage.setItem("tutorialContentHash", contentHash);
-      localStorage.removeItem("dontShowTutorial");
-      setShowTutorial(true);
-    } else if (!storedDontShow) {
-      setShowTutorial(true);
-    }
-    setDontShowTutorial(storedDontShow);
-  }, [contentHash]);
-
-  useEffect(() => {
-    localStorage.setItem(
-      `dismissedNotifications_${auth.currentUser?.uid}`,
-      JSON.stringify(dismissedNotifications)
-    );
-  }, [dismissedNotifications]);
-
-  const handleDontShowChange = (e) => {
-    const checked = e.target.checked;
-    setDontShowTutorial(checked);
-    localStorage.setItem("dontShowTutorial", checked);
-  };
-
-  const dismissNotification = (notificationId) => {
-    setDismissedNotifications((prev) => [...prev, notificationId]);
-  };
 
   const showTaskDescription = (taskId) => {
     const task = globalTasks[taskId];
@@ -118,7 +74,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
   useEffect(() => {
     const interval = setInterval(() => {
       syncWithFirebase(true);
-    }, 2000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [syncWithFirebase]);
 
@@ -397,6 +353,16 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       transition: "transform 0.2s, background 0.2s",
     },
+    readyCheckbox: {
+      marginLeft: "10px",
+      verticalAlign: "middle",
+    },
+    readyLabel: {
+      fontSize: "14px",
+      color: "#333",
+      marginLeft: "5px",
+      verticalAlign: "middle",
+    },
   };
 
   const stylesString = `
@@ -453,6 +419,10 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     transform: scale(1.05);
     background: #dc3545;
   }
+  /* Checkbox hover effect */
+  .ready-checkbox:hover + .ready-label {
+    color: #007bff;
+  }
   `;
 
   const toggleAchievementSection = (category) => {
@@ -487,75 +457,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       {isSyncing && (
         <div style={styles.syncOverlay}>Syncing, please wait...</div>
       )}
-      {showTutorial && (
-        <>
-          <div
-            style={styles.tutorialOverlay}
-            onClick={() => setShowTutorial(false)}
-          ></div>
-          <div style={styles.tutorialModal} className="tutorial-modal">
-            <h3 style={{ marginBottom: "20px", fontWeight: "bold" }}>
-              Welcome to Daily Mode
-            </h3>
-            <div style={styles.tutorialContent}>
-              <ul style={{ paddingLeft: "20px" }}>
-                {normalTutorialMessages.map((msg, index) => (
-                  <li key={index} style={{ marginBottom: "10px" }}>
-                    {msg}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                marginBottom: "20px",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={dontShowTutorial}
-                onChange={handleDontShowChange}
-                style={styles.tutorialCheckbox}
-                id="dontShowTutorial"
-              />
-              <label htmlFor="dontShowTutorial">Don't show this again</label>
-            </div>
-            <button
-              onClick={() => setShowTutorial(false)}
-              style={styles.tutorialButton}
-            >
-              Got It!
-            </button>
-          </div>
-        </>
-      )}
-      {notifications
-        .filter((n) => n.global && !dismissedNotifications.includes(n.id))
-        .map((notification) => (
-          <React.Fragment key={notification.id}>
-            <div
-              style={styles.tutorialOverlay}
-              onClick={() => dismissNotification(notification.id)}
-            ></div>
-            <div
-              style={styles.notificationModal}
-              className="notification-modal"
-            >
-              <h3 style={{ marginBottom: "20px", fontWeight: "bold" }}>
-                Notification
-              </h3>
-              <div style={styles.tutorialContent}>{notification.message}</div>
-              <button
-                onClick={() => dismissNotification(notification.id)}
-                style={styles.notificationButton}
-              >
-                Close
-              </button>
-            </div>
-          </React.Fragment>
-        ))}
       <style>{stylesString}</style>
       <nav style={styles.normalmodenav}>
         <div className="nav-brand">
@@ -663,6 +564,23 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                           ).length
                         }
                       </span>
+                    </div>
+                    <div className="mt-2 d-flex align-items-center">
+                      <input
+                        type="checkbox"
+                        checked={isReady}
+                        onChange={(e) => setIsReady(e.target.checked)}
+                        style={styles.readyCheckbox}
+                        className="ready-checkbox"
+                        id="ready-checkbox"
+                      />
+                      <label
+                        htmlFor="ready-checkbox"
+                        style={styles.readyLabel}
+                        className="ready-label"
+                      >
+                        Ready
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -1213,6 +1131,60 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                   </div>
                 </div>
               </div>
+              <div className="col-12 col-md-6 mb-3">
+  <div style={styles.dashboardCard} className="card shadow-sm h-100">
+    <div style={styles.cardBody}>
+      <div className="d-flex justify-content-between align-items-center">
+        <h6 style={styles.cardTitle}>This Week Completed Tasks</h6>
+        <button
+          onClick={() => setIsWeeklyTasksOpen(!isWeeklyTasksOpen)}
+          className="btn btn-outline-primary btn-sm"
+        >
+          {isWeeklyTasksOpen ? "Hide" : "Show"}
+        </button>
+      </div>
+      {isWeeklyTasksOpen && (
+        <div>
+          {userData.completedTasks.length > 0 ? (
+            <ul className="list-group list-group-flush">
+              {userData.completedTasks.map((task, index) => (
+                <li
+                  key={index}
+                  style={
+                    task.isPenalty
+                      ? styles.penaltyListGroupItem
+                      : styles.listGroupItem
+                  }
+                  className="d-flex justify-content-between align-items-center py-1"
+                >
+                  <span>
+                    <span className="fw-bold text-dark">
+                      {task.completionCount}x
+                    </span>{" "}
+                    {task.name}{" "}
+                    <small className="text-muted ms-2">
+                      (Daily: {task.dailyCounter}/{task.dailyLimit})
+                    </small>
+                  </span>
+                  <button
+                    onClick={() => undoTask(index)}
+                    className="btn btn-danger btn-sm"
+                  >
+                    Undo
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted text-center small">
+              No completed tasks this week.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+</div>
             </div>
           </>
         )}

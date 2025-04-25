@@ -63,7 +63,10 @@ const Statistics = () => {
         );
         setTasks(filteredTasks);
         setCompletedTasks(completedSnap.val() || []);
-        setCurrentWeek(weekSnap.val() || 1);
+
+        // Ensure currentWeek is at least 1
+        const weekNumber = weekSnap.val() || 1;
+        setCurrentWeek(weekNumber);
 
         if (metadataSnap.exists()) {
           const createdAt =
@@ -83,16 +86,28 @@ const Statistics = () => {
           (sum, task) => sum + (task.lifetimeCompletionCount || 0),
           0
         );
-        const totalPossible =
-          filteredTasks.reduce(
-            (sum, task) => sum + (task.numberLimit || 0),
-            0
-          ) * (weekSnap.val() || 1);
+        const totalPossible = filteredTasks.reduce(
+          (sum, task) => sum + ((task.numberLimit || 0) * weekNumber),
+          0
+        );
         setOverallPerf(
           totalPossible > 0
             ? Math.round((totalCompletion / totalPossible) * 100)
             : 0
         );
+
+        // Debugging: Log values to verify
+        console.log({
+          weekNumber,
+          totalCompletion,
+          totalPossible,
+          filteredTasks: filteredTasks.map((t) => ({
+            name: t.name,
+            lifetimeCompletionCount: t.lifetimeCompletionCount,
+            numberLimit: t.numberLimit,
+            totalPossible: t.numberLimit * weekNumber,
+          })),
+        });
       } catch (error) {
         console.error("Fetch error:", error);
         Swal.fire({
@@ -291,7 +306,7 @@ const Statistics = () => {
                               (totalTaskCompletion / totalTaskPossible) * 100
                             )
                           : 0;
-                        const weeklyPerf = weeklyTask?.numberLimit
+                        const weeklyPerf = weeklyTask?.completionCount
                           ? Math.round(
                               (weeklyTask.completionCount / task.numberLimit) *
                                 100
@@ -310,7 +325,9 @@ const Statistics = () => {
                                 {totalTaskCompletion}/{totalTaskPossible})
                               </span>
                               <span className="badge bg-success">
-                                Week: {weeklyPerf}%
+                                Week: {weeklyPerf}% (
+                                {weeklyTask?.completionCount || 0}/
+                                {task.numberLimit})
                               </span>
                             </span>
                           </li>
