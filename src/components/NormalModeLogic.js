@@ -98,7 +98,6 @@ export const useNormalModeLogic = (
         : [],
       achievements: parsedData.achievements || {},
       lastUpdated: parsedData.lastUpdated || Date.now(),
-      isReady: parsedData.isReady || false,
     };
   });
   const [notifications, setNotifications] = useState([]);
@@ -110,7 +109,6 @@ export const useNormalModeLogic = (
   const [isCompletedTasksOpen, setIsCompletedTasksOpen] = useState(false);
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
-  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let timeoutId;
@@ -143,14 +141,6 @@ export const useNormalModeLogic = (
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [navigate, globalTasks, authInitialized]);
-
-  useEffect(() => {
-    if (userId) {
-      update(ref(database, `users/${userId}`), { isReady }).catch((error) =>
-        console.error("Failed to sync isReady:", error)
-      );
-    }
-  }, [isReady, userId]);
 
   const groupedTasks = useMemo(() => {
     if (!Array.isArray(userData.tasks)) return {};
@@ -199,7 +189,6 @@ export const useNormalModeLogic = (
             ...localData,
             tasks: tasksToSync,
             lastUpdated: Date.now(),
-            isReady: userData.isReady,
           });
         }
       } catch (error) {
@@ -211,7 +200,7 @@ export const useNormalModeLogic = (
         throw error;
       }
     },
-    [userId, userData.lastUpdated, userData.isReady]
+    [userId, userData.lastUpdated]
   );
 
   useEffect(() => {
@@ -268,7 +257,6 @@ export const useNormalModeLogic = (
             : [],
           achievements: firebaseData.achievements || {},
           lastUpdated: firebaseData.lastUpdated || Date.now(),
-          isReady: firebaseData.isReady || false,
           mode: firebaseData.preferences?.mode || "daily",
           currentWeek: firebaseData.currentWeek || 1,
         };
@@ -278,7 +266,6 @@ export const useNormalModeLogic = (
           JSON.stringify(initialUserData)
         );
         setUserData(initialUserData);
-        setIsReady(initialUserData.isReady);
         setOpenSections(
           Object.keys(groupedTasks).reduce(
             (acc, category) => ({ ...acc, [category]: category === "Task" }),
@@ -919,12 +906,45 @@ export const useNormalModeLogic = (
     }
 
     const newWeekNumber = currentWeek + 1;
+
+    // Calculate weekly performance
+    const weeklyPerformance = {};
+    let totalWeeklyCompletion = 0;
+    let totalPossible = 0;
+    const taskPerformances = userData.tasks
+      .filter((task) => task.category === "Task")
+      .map((task) => {
+        const weeklyTask = userData.completedTasks.find(
+          (t) => t.name === task.name
+        );
+        const completionCount = weeklyTask?.completionCount || 0;
+        const numberLimit = task.numberLimit || Infinity;
+        const performance = numberLimit
+          ? Math.round((completionCount / numberLimit) * 100)
+          : 0;
+        weeklyPerformance[task.taskId] = {
+          name: task.name,
+          performance,
+          completionCount,
+          numberLimit,
+        };
+        totalWeeklyCompletion += completionCount;
+        totalPossible += numberLimit;
+        return performance;
+      });
+    const overallWeeklyPerformance =
+      totalPossible > 0
+        ? Math.round((totalWeeklyCompletion / totalPossible) * 100)
+        : 0;
+    weeklyPerformance.overall = overallWeeklyPerformance;
+
     const weekArchive = {
       timestamp: Date.now(),
       weekNumber: currentWeek,
       completedTasks: [...userData.completedTasks],
       points: userData.points.current,
       Mpoints: userData.Mpoints.current,
+      weeklyPerformance,
     };
 
     try {
@@ -935,6 +955,8 @@ export const useNormalModeLogic = (
           acc[task.taskId] = task.completionCount || 0;
           return acc;
         }, {});
+      updates[`users/${userId}/weeklyPerformance/${currentWeek}`] =
+        weekArchive.weeklyPerformance;
       updates[`users/${userId}/currentWeek`] = newWeekNumber;
       updates[`users/${userId}/completedTasks`] = [];
       updates[`users/${userId}/tasks`] = userData.tasks.reduce((acc, task) => {
@@ -949,7 +971,6 @@ export const useNormalModeLogic = (
         return acc;
       }, {});
       updates[`users/${userId}/points`] = { current: 0, total: 800 };
-      updates[`users/${userId}/isReady`] = false;
 
       await update(ref(database), updates);
 
@@ -967,7 +988,6 @@ export const useNormalModeLogic = (
         completedTasks: [],
         points: { current: 0, total: 800 },
         currentWeek: newWeekNumber,
-        isReady: false,
       });
 
       // Trigger stats refresh
@@ -1015,7 +1035,6 @@ export const useNormalModeLogic = (
     const resetTasks = userData.tasks.map((task) => ({
       ...task,
       dailyCounter: 0,
-      bonusClaimed: false,
     }));
     const resetCompletedTasks = userData.completedTasks.map((task) => ({
       ...task,
@@ -1491,7 +1510,5 @@ export const useNormalModeLogic = (
     sendGlobalNotification,
     submitFeedback,
     viewFeedback,
-    isReady,
-    setIsReady,
   };
 };

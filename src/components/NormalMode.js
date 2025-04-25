@@ -47,15 +47,14 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     sendGlobalNotification,
     submitFeedback,
     viewFeedback,
-    isReady, 
-    setIsReady, 
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "weekly");
 
-  const [openAchievementSections, setOpenAchievementSections] = React.useState({});
+  const [openAchievementSections, setOpenAchievementSections] = React.useState(
+    {}
+  );
   const [adminSelectedTaskId, setAdminSelectedTaskId] = useState("");
   const [adminSelectedBoost, setAdminSelectedBoost] = useState("");
   const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = useState(false);
-
 
   const showTaskDescription = (taskId) => {
     const task = globalTasks[taskId];
@@ -76,7 +75,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       syncWithFirebase(true);
     }, 10000);
     return () => clearInterval(interval);
-  }, [syncWithFirebase]);
+  }, []);
 
   const handleSaveProgress = async () => {
     try {
@@ -303,9 +302,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       lineHeight: "1.6",
       marginBottom: "20px",
     },
-    tutorialCheckbox: {
-      marginRight: "10px",
-    },
+
     tutorialButton: {
       backgroundColor: "#ffc107",
       color: "#000",
@@ -352,16 +349,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       justifyContent: "center",
       boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       transition: "transform 0.2s, background 0.2s",
-    },
-    readyCheckbox: {
-      marginLeft: "10px",
-      verticalAlign: "middle",
-    },
-    readyLabel: {
-      fontSize: "14px",
-      color: "#333",
-      marginLeft: "5px",
-      verticalAlign: "middle",
     },
   };
 
@@ -418,10 +405,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
   .nav-logout:hover {
     transform: scale(1.05);
     background: #dc3545;
-  }
-  /* Checkbox hover effect */
-  .ready-checkbox:hover + .ready-label {
-    color: #007bff;
   }
   `;
 
@@ -564,23 +547,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                           ).length
                         }
                       </span>
-                    </div>
-                    <div className="mt-2 d-flex align-items-center">
-                      <input
-                        type="checkbox"
-                        checked={isReady}
-                        onChange={(e) => setIsReady(e.target.checked)}
-                        style={styles.readyCheckbox}
-                        className="ready-checkbox"
-                        id="ready-checkbox"
-                      />
-                      <label
-                        htmlFor="ready-checkbox"
-                        style={styles.readyLabel}
-                        className="ready-label"
-                      >
-                        Ready
-                      </label>
                     </div>
                   </div>
                 </div>
@@ -1132,59 +1098,65 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                 </div>
               </div>
               <div className="col-12 col-md-6 mb-3">
-  <div style={styles.dashboardCard} className="card shadow-sm h-100">
-    <div style={styles.cardBody}>
-      <div className="d-flex justify-content-between align-items-center">
-        <h6 style={styles.cardTitle}>This Week Completed Tasks</h6>
-        <button
-          onClick={() => setIsWeeklyTasksOpen(!isWeeklyTasksOpen)}
-          className="btn btn-outline-primary btn-sm"
-        >
-          {isWeeklyTasksOpen ? "Hide" : "Show"}
-        </button>
-      </div>
-      {isWeeklyTasksOpen && (
-        <div>
-          {userData.completedTasks.length > 0 ? (
-            <ul className="list-group list-group-flush">
-              {userData.completedTasks.map((task, index) => (
-                <li
-                  key={index}
-                  style={
-                    task.isPenalty
-                      ? styles.penaltyListGroupItem
-                      : styles.listGroupItem
-                  }
-                  className="d-flex justify-content-between align-items-center py-1"
+                <div
+                  style={styles.dashboardCard}
+                  className="card shadow-sm h-100"
                 >
-                  <span>
-                    <span className="fw-bold text-dark">
-                      {task.completionCount}x
-                    </span>{" "}
-                    {task.name}{" "}
-                    <small className="text-muted ms-2">
-                      (Daily: {task.dailyCounter}/{task.dailyLimit})
-                    </small>
-                  </span>
-                  <button
-                    onClick={() => undoTask(index)}
-                    className="btn btn-danger btn-sm"
-                  >
-                    Undo
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted text-center small">
-              No completed tasks this week.
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  </div>
-</div>
+                  <div style={styles.cardBody}>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <h6 style={styles.cardTitle}>
+                        This Week Completed Tasks
+                      </h6>
+                      <button
+                        onClick={() => setIsWeeklyTasksOpen(!isWeeklyTasksOpen)}
+                        className="btn btn-outline-primary btn-sm"
+                      >
+                        {isWeeklyTasksOpen ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                    {isWeeklyTasksOpen && (
+                      <div>
+                        {userData.completedTasks.length > 0 ? (
+                          <ul className="list-group list-group-flush">
+                            {userData.completedTasks.map((task, index) => (
+                              <li
+                                key={index}
+                                style={
+                                  task.isPenalty
+                                    ? styles.penaltyListGroupItem
+                                    : styles.listGroupItem
+                                }
+                                className="d-flex justify-content-between align-items-center py-1"
+                              >
+                                <span>
+                                  <span className="fw-bold text-dark">
+                                    {task.completionCount}x
+                                  </span>{" "}
+                                  {task.name}{" "}
+                                  <small className="text-muted ms-2">
+                                    (Daily: {task.dailyCounter}/
+                                    {task.dailyLimit})
+                                  </small>
+                                </span>
+                                <button
+                                  onClick={() => undoTask(index)}
+                                  className="btn btn-danger btn-sm"
+                                >
+                                  Undo
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-muted text-center small">
+                            No completed tasks this week.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </>
         )}

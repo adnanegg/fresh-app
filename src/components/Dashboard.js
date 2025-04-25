@@ -78,6 +78,21 @@ const Dashboard = () => {
 
   const fetchUserData = useCallback(async (userId) => {
     try {
+      // MODIFIED: Replaced usersSnap with isReadyCountsSnap
+      const queries = [
+        get(ref(database, `users/${userId}/profile`)),
+        get(ref(database, `users/${userId}/points`)),
+        get(ref(database, `users/${userId}/Mpoints`)),
+        get(ref(database, `users/${userId}/achievements`)),
+        get(ref(database, `users/${userId}/tasks`)),
+        get(ref(database, "globalTasks")),
+      ];
+
+      // Only fetch isReadyCounts if the user is admin
+      if (auth.currentUser?.email === "admin@gmail.com") {
+        queries.push(get(ref(database, "isReadyCounts")));
+      }
+
       const [
         profileSnap,
         pointsSnap,
@@ -85,16 +100,8 @@ const Dashboard = () => {
         achievementsSnap,
         tasksSnap,
         globalTasksSnap,
-        usersSnap,
-      ] = await Promise.all([
-        get(ref(database, `users/${userId}/profile`)),
-        get(ref(database, `users/${userId}/points`)),
-        get(ref(database, `users/${userId}/Mpoints`)),
-        get(ref(database, `users/${userId}/achievements`)),
-        get(ref(database, `users/${userId}/tasks`)),
-        get(ref(database, "globalTasks")),
-        get(ref(database, "users")),
-      ]);
+        isReadyCountsSnap, // This will be undefined for non-admins
+      ] = await Promise.all(queries);
 
       const firebaseData = {
         profile: profileSnap.val() || { name: "User" },
@@ -107,12 +114,11 @@ const Dashboard = () => {
 
       const globalTasks = globalTasksSnap.val() || {};
 
+      // MODIFIED: Count ready users from isReadyCounts
       let readyCount = 0;
       if (auth.currentUser?.email === "admin@gmail.com") {
-        const users = usersSnap.val() || {};
-        readyCount = Object.values(users).filter(
-          (user) => user.isReady === true
-        ).length;
+        const isReadyCounts = isReadyCountsSnap.val() || {};
+        readyCount = Object.keys(isReadyCounts).length; // NEW: Count UIDs in isReadyCounts
       }
 
       setUserProfile(firebaseData.profile);
@@ -180,6 +186,7 @@ const Dashboard = () => {
         setPointsData(cachedUserData.points || { current: 0, total: 800 });
         setMpointsData(cachedUserData.Mpoints || { current: 0, total: 2800 });
         setAchievementsData(cachedUserData.achievements || {});
+        setReadyUsersCount(0); // NEW: Reset readyUsersCount in cache fallback
 
         const cachedTaskPercentages = [
           "book_read",
@@ -271,13 +278,13 @@ const Dashboard = () => {
         const modeSnap = await get(
           ref(database, `users/${userId}/preferences/mode`)
         );
-        const trackerMode = modeSnap.val() || "weekly"; // Default to weekly if not set
+        const trackerMode = modeSnap.val() || "weekly";
         setProgramLink(
           trackerMode === "daily" ? "/normal-mode" : "/weekly-mode"
         );
       } catch (error) {
         console.error("Failed to fetch tracker mode:", error);
-        setProgramLink("/weekly-mode"); // Fallback to weekly on error
+        setProgramLink("/weekly-mode");
       }
     };
     if (userId) {
@@ -524,7 +531,7 @@ const Dashboard = () => {
         await remove(userRef);
         await deleteUser(user);
         localStorage.removeItem(`userData_${userId}`);
-        localStorage.removeItem("trackerMode"); // Clear tracker mode as well
+        localStorage.removeItem("trackerMode");
 
         await Swal.fire({
           icon: "success",
@@ -538,7 +545,6 @@ const Dashboard = () => {
     } catch (error) {
       console.error("Account deletion error:", error);
       if (error.code === "auth/requires-recent-login") {
-        // Prompt for re-authentication
         const { value: credentials } = await Swal.fire({
           title: "Re-authentication Required",
           text: "Please enter your email and password to confirm account deletion.",
@@ -564,7 +570,6 @@ const Dashboard = () => {
 
         if (credentials) {
           try {
-            // Re-authenticate user
             const user = auth.currentUser;
             const credential = EmailAuthProvider.credential(
               credentials.email,
@@ -572,7 +577,6 @@ const Dashboard = () => {
             );
             await reauthenticateWithCredential(user, credential);
 
-            // Retry deletion
             Swal.fire({
               title: "Deleting Account...",
               allowOutsideClick: false,
@@ -677,7 +681,6 @@ const Dashboard = () => {
     }
 
     try {
-      // Update localStorage first
       const cachedUserData =
         JSON.parse(localStorage.getItem(`userData_${userId}`)) || {};
       const updatedCachedData = {
@@ -690,10 +693,8 @@ const Dashboard = () => {
         JSON.stringify(updatedCachedData)
       );
 
-      // Update state to reflect change locally
       setUserProfile({ name: tempName });
 
-      // Then update Firebase
       const userRef = ref(database, `users/${userId}/profile`);
       const updatedProfile = { name: tempName };
       await update(userRef, updatedProfile);
@@ -953,7 +954,7 @@ const Dashboard = () => {
       textAlign: "center",
       padding: "15px",
       borderRadius: "8px",
-      background: "linear-gradient(135deg, #28a745, #007bff)", // Green to blue gradient
+      background: "linear-gradient(135deg, #28a745, #007bff)",
       boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
       transition: "background 0.3s ease, transform 0.3s ease",
       position: "relative",
@@ -1093,6 +1094,81 @@ const Dashboard = () => {
             </button>
           </div>
         )}
+        {isAdmin && (
+          <div className="mb-4">
+            <button
+              onClick={submitAllUserForms}
+              className="btn btn-danger w-100 mb-2"
+              style={{ padding: "10px", position: "relative", zIndex: 100 }}
+            >
+              <i className="bi bi-send-fill me-2"></i>Submit All Weekly Data
+            </button>
+            <button
+              onClick={submitAllUserMonthlyForms}
+              className="btn btn-danger w-100"
+              style={{ padding: "10px", position: "relative", zIndex: 100 }}
+            >
+              <i className="bi bi-send-fill me-2"></i>Submit All Monthly Data
+            </button>
+          </div>
+        )}
+        <div className="row mb-4">
+          <div className="col-12 col-md-6 mb-3 mb-md-0">
+            <div style={styles.dashboardCard} className="card shadow-sm">
+              <div style={styles.cardBody} className="text-center p-3">
+                {isEditingName ? (
+                  <div>
+                    <input
+                      type="text"
+                      value={tempName}
+                      onChange={(e) => setTempName(e.target.value)}
+                      style={styles.nameEditInput}
+                    />
+                    <button
+                      onClick={handleNameChange}
+                      style={styles.nameEditButton}
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingName(false);
+                        setTempName(userProfile.name);
+                      }}
+                      style={styles.nameCancelButton}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <h4
+                      style={styles.cardTitle}
+                      className="text-dark fw-bold mb-1"
+                    >
+                      {userProfile.name}
+                    </h4>
+                    <button
+                      onClick={() => setIsEditingName(true)}
+                      className="btn btn-sm btn-outline-primary mt-2"
+                    >
+                      Edit Name
+                    </button>
+                    <button
+                      onClick={handleDeleteAccount}
+                      className="btn btn-sm btn-outline-danger mt-2 mx-2"
+                    >
+                      <i className="bi bi-trash-fill me-1"></i>Delete Account
+                    </button>
+                  </>
+                )}
+                <p className="text-muted small">
+                  User ID: {auth.currentUser?.uid?.slice(0, 8)}...
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div className="row mb-4">
           <div className="col-12 col-md-4 mb-3 mb-md-0">
