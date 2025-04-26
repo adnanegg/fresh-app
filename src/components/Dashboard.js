@@ -46,6 +46,17 @@ const Dashboard = () => {
   const [tempName, setTempName] = useState(userProfile.name);
   const [programLink, setProgramLink] = useState("/normal-mode");
 
+  // Define performance goals for all tasks
+  const taskGoals = {
+    Book: 70,
+    Quran: 70,
+    Sport: 70,
+    Prayer: 70,
+    QuranListen: 70,
+    Improvement: 70,
+    WakeUp: 70,
+  };
+
   useEffect(() => {
     setScoreFormData((prev) => ({
       ...prev,
@@ -790,28 +801,33 @@ const Dashboard = () => {
       textShadow: "2px 2px 4px rgba(0, 0, 0, 0.3)",
       fontFamily: "'MedievalSharp', cursive",
     },
-    scoreFormInputWrapper: {
-      position: "relative",
+    taskProgressContainer: {
       marginBottom: "15px",
     },
-    scoreFormInput: {
-      width: "100%",
-      padding: "12px 12px 12px 40px",
-      borderRadius: "8px",
-      border: "1px solid #b8860b",
-      backgroundColor: "rgba(255, 245, 220, 0.9)",
-      fontSize: "16px",
-      color: "#333",
-      boxShadow: "inset 0 2px 4px rgba(0, 0, 0, 0.1)",
-      transition: "border-color 0.3s ease, transform 0.2s ease",
+    taskProgressBar: {
+      height: "20px",
+      backgroundColor: "#e9ecef",
+      borderRadius: "4px",
+      overflow: "hidden",
+      position: "relative",
     },
-    scoreFormInputIcon: {
+    taskProgressFill: {
+      height: "100%",
+      transition: "width 0.3s ease",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      paddingRight: "5px",
+      color: "white",
+      fontSize: "12px",
+      fontWeight: "bold",
+    },
+    taskGoalMarker: {
       position: "absolute",
-      left: "10px",
-      top: "50%",
-      transform: "translateY(-50%)",
-      color: "#b8860b",
-      fontSize: "18px",
+      height: "100%",
+      width: "2px",
+      backgroundColor: "rgba(0,0,0,0.7)",
+      zIndex: 2,
     },
     videoBackground: {
       position: "fixed",
@@ -933,6 +949,16 @@ const Dashboard = () => {
       borderRadius: "4px",
       cursor: "pointer",
     },
+    readyUsersCard: {
+      textAlign: "center",
+      padding: "15px",
+      borderRadius: "8px",
+      background: "linear-gradient(135deg, #28a745, #007bff)",
+      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+      transition: "background 0.3s ease, transform 0.3s ease",
+      position: "relative",
+      overflow: "hidden",
+    },
   };
 
   const stylesString = `
@@ -1044,6 +1070,7 @@ const Dashboard = () => {
             </button>
           </div>
         )}
+
         <div className="row mb-4">
           <div className="col-12 col-md-6 mb-3 mb-md-0">
             <div style={styles.dashboardCard} className="card shadow-sm">
@@ -1179,165 +1206,78 @@ const Dashboard = () => {
           <div className="col-12 col-md-6 mb-3">
             <div style={styles.scoreFormCard} className="card shadow-sm">
               <div style={styles.cardBody} className="p-3">
-                <h3 style={styles.scoreFormTitle}>Weekly Stats</h3>
-                <div>
-                  <div className="row">
-                    <div className="col-12 col-md-4 mb-3">
-                      <div style={styles.scoreFormInputWrapper}>
-                        <span
-                          style={{
-                            ...styles.scoreFormInputIcon,
-                            fontSize: "16px",
-                            color: "#b8860b",
-                          }}
-                        >
-                          Book:
+                <h3 style={styles.scoreFormTitle}>Weekly Performance Goals</h3>
+                {[
+                  { name: "Book", key: "BookP", color: "#28a745" },
+                  { name: "Quran", key: "QuoranP", color: "#17a2b8" },
+                  { name: "Prayer", key: "PrayerP", color: "#6f42c1" },
+                  { name: "Sport", key: "SportP", color: "#fd7e14" },
+                  {
+                    name: "Quran Listen",
+                    key: "QuranListenP",
+                    color: "#20c997",
+                  },
+                  {
+                    name: "Improvement",
+                    key: "Improvement15minP",
+                    color: "#e83e8c",
+                  },
+                  { name: "Wake Up", key: "WakeUpEarlyP", color: "#6c757d" },
+                ].map((task) => {
+                  const percentage = parseFloat(
+                    scoreFormData[task.key]?.replace("%", "") || 0
+                  );
+                  const goal = taskGoals[task.name];
+
+                  return (
+                    <div key={task.name} style={styles.taskProgressContainer}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: "5px",
+                        }}
+                      >
+                        <span style={{ fontWeight: "bold" }}>{task.name}</span>
+                        <span>
+                          {percentage.toFixed(1)}% / {goal}%
                         </span>
-                        <p
+                      </div>
+                      <div style={styles.taskProgressBar}>
+                        <div
                           style={{
-                            ...styles.scoreFormInput,
-                            paddingLeft: "60px",
+                            ...styles.taskProgressFill,
+                            width: `${Math.min(percentage, 100)}%`,
+                            backgroundColor: task.color,
                           }}
-                          className="score-form-input"
                         >
-                          {scoreFormData.BookP}
-                        </p>
+                          {percentage > 10 ? `${percentage.toFixed(1)}%` : ""}
+                        </div>
+                        {percentage <= 10 && (
+                          <span
+                            style={{
+                              position: "absolute",
+                              left: "5px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              color: "#495057",
+                              fontSize: "12px",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {percentage.toFixed(1)}%
+                          </span>
+                        )}
+                        <div
+                          style={{
+                            ...styles.taskGoalMarker,
+                            left: `${goal}%`,
+                          }}
+                        ></div>
                       </div>
                     </div>
-                    <div className="col-12 col-md-4 mb-3">
-                      <div style={styles.scoreFormInputWrapper}>
-                        <span
-                          style={{
-                            ...styles.scoreFormInputIcon,
-                            fontSize: "16px",
-                            color: "#b8860b",
-                          }}
-                        >
-                          Quran:
-                        </span>
-                        <p
-                          style={{
-                            ...styles.scoreFormInput,
-                            paddingLeft: "60px",
-                          }}
-                          className="score-form-input"
-                        >
-                          {scoreFormData.QuoranP}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="col-12 col-md-4 mb-3">
-                      <div style={styles.scoreFormInputWrapper}>
-                        <span
-                          style={{
-                            ...styles.scoreFormInputIcon,
-                            fontSize: "16px",
-                            color: "#b8860b",
-                          }}
-                        >
-                          Prayer:
-                        </span>
-                        <p
-                          style={{
-                            ...styles.scoreFormInput,
-                            paddingLeft: "70px",
-                          }}
-                          className="score-form-input"
-                        >
-                          {scoreFormData.PrayerP}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="col-12 col-md-4 mb-3">
-                      <div style={styles.scoreFormInputWrapper}>
-                        <span
-                          style={{
-                            ...styles.scoreFormInputIcon,
-                            fontSize: "16px",
-                            color: "#b8860b",
-                          }}
-                        >
-                          Sport:
-                        </span>
-                        <p
-                          style={{
-                            ...styles.scoreFormInput,
-                            paddingLeft: "60px",
-                          }}
-                          className="score-form-input"
-                        >
-                          {scoreFormData.SportP}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="col-12 col-md-4 mb-3">
-                      <div style={styles.scoreFormInputWrapper}>
-                        <span
-                          style={{
-                            ...styles.scoreFormInputIcon,
-                            fontSize: "16px",
-                            color: "#b8860b",
-                          }}
-                        >
-                          Quran Listen:
-                        </span>
-                        <p
-                          style={{
-                            ...styles.scoreFormInput,
-                            paddingLeft: "110px",
-                          }}
-                          className="score-form-input"
-                        >
-                          {scoreFormData.QuranListenP}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="col-12 col-md-4 mb-3">
-                      <div style={styles.scoreFormInputWrapper}>
-                        <span
-                          style={{
-                            ...styles.scoreFormInputIcon,
-                            fontSize: "16px",
-                            color: "#b8860b",
-                          }}
-                        >
-                          Improvement:
-                        </span>
-                        <p
-                          style={{
-                            ...styles.scoreFormInput,
-                            paddingLeft: "110px",
-                          }}
-                          className="score-form-input"
-                        >
-                          {scoreFormData.Improvement15minP}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="col-12 col-md-4 mb-3">
-                      <div style={styles.scoreFormInputWrapper}>
-                        <span
-                          style={{
-                            ...styles.scoreFormInputIcon,
-                            fontSize: "16px",
-                            color: "#b8860b",
-                          }}
-                        >
-                          Wake Up:
-                        </span>
-                        <p
-                          style={{
-                            ...styles.scoreFormInput,
-                            paddingLeft: "80px",
-                          }}
-                          className="score-form-input"
-                        >
-                          {scoreFormData.WakeUpEarlyP}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1346,41 +1286,73 @@ const Dashboard = () => {
               <div style={styles.cardBody} className="p-3">
                 <h3 style={styles.scoreFormTitle}>Achievements</h3>
                 <div>
-                  <div style={styles.scoreFormInputWrapper}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      marginBottom: "15px",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      backgroundColor: "rgba(205, 127, 50, 0.1)",
+                    }}
+                  >
                     <i
                       className="bi bi-star-fill"
-                      style={{ ...styles.scoreFormInputIcon, color: "#cd7f32" }}
+                      style={{
+                        marginRight: "10px",
+                        color: "#cd7f32",
+                        fontSize: "20px",
+                      }}
                     ></i>
-                    <p
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    >
-                      {monthlyScoreFormData.bronze}
-                    </p>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: "bold" }}>Bronze</div>
+                      <div>{monthlyScoreFormData.bronze} achievements</div>
+                    </div>
                   </div>
-                  <div style={styles.scoreFormInputWrapper}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      marginBottom: "15px",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      backgroundColor: "rgba(192, 192, 192, 0.1)",
+                    }}
+                  >
                     <i
                       className="bi bi-star-fill"
-                      style={{ ...styles.scoreFormInputIcon, color: "#c0c0c0" }}
+                      style={{
+                        marginRight: "10px",
+                        color: "#c0c0c0",
+                        fontSize: "20px",
+                      }}
                     ></i>
-                    <p
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    >
-                      {monthlyScoreFormData.silver}
-                    </p>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: "bold" }}>Silver</div>
+                      <div>{monthlyScoreFormData.silver} achievements</div>
+                    </div>
                   </div>
-                  <div style={styles.scoreFormInputWrapper}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      backgroundColor: "rgba(255, 215, 0, 0.1)",
+                    }}
+                  >
                     <i
                       className="bi bi-star-fill"
-                      style={{ ...styles.scoreFormInputIcon, color: "#ffd700" }}
+                      style={{
+                        marginRight: "10px",
+                        color: "#ffd700",
+                        fontSize: "20px",
+                      }}
                     ></i>
-                    <p
-                      style={styles.scoreFormInput}
-                      className="score-form-input"
-                    >
-                      {monthlyScoreFormData.gold}
-                    </p>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: "bold" }}>Gold</div>
+                      <div>{monthlyScoreFormData.gold} achievements</div>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { auth, database } from "../firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+} from "firebase/auth";
 import { ref, set, get } from "firebase/database";
 import { useNavigate, Link } from "react-router-dom";
 import "./styles/Signup.css";
@@ -16,13 +19,17 @@ const Signup = () => {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+
+    // Clear old user data from localStorage
     const oldUserId = localStorage.getItem("userId");
     if (oldUserId) {
       localStorage.removeItem(`userData_${oldUserId}`);
     }
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("userId");
+
     try {
+      // Create user with email and password
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -31,11 +38,40 @@ const Signup = () => {
       const user = userCredential.user;
       const userId = user.uid;
 
-      const now = Date.now();
+      console.log("User created with UID:", userId);
 
+      // Wait for the authentication state to fully update
+      await new Promise((resolve, reject) => {
+        const unsubscribe = onAuthStateChanged(
+          auth,
+          (currentUser) => {
+            unsubscribe(); // Unsubscribe immediately after first callback
+            if (currentUser && currentUser.uid === userId) {
+              console.log("Auth state confirmed for UID:", currentUser.uid);
+              resolve(currentUser);
+            } else {
+              reject(new Error("Authentication state not updated correctly"));
+            }
+          },
+          reject
+        );
+      });
+
+      // Fetch global tasks
       const globalTasksRef = ref(database, "globalTasks");
-      const globalTasksSnapshot = await get(globalTasksRef);
-      const globalTasks = globalTasksSnapshot.val() || {};
+      let globalTasks = {};
+      try {
+        const globalTasksSnapshot = await get(globalTasksRef);
+        globalTasks = globalTasksSnapshot.val() || {};
+      } catch (error) {
+        console.warn(
+          "Failed to fetch globalTasks (admin-only access):",
+          error.message
+        );
+        // Since globalTasks has admin-only read access, new users can't read it.
+        // This is okay because we only need globalTasks for initializing tasks,
+        // and we can handle an empty object gracefully.
+      }
 
       // Cache globalTasks in localStorage
       localStorage.setItem("globalTasks", JSON.stringify(globalTasks));
@@ -48,12 +84,13 @@ const Signup = () => {
             completionCount: 0,
             dailyCounter: 0,
             boost: null,
-            hasTimesOption: globalTasks[taskId].hasTimesOption || false,
+            hasTimesOption: globalTasks[taskId]?.hasTimesOption || false,
             selectedMode: "normal",
           },
         ])
       );
 
+      const now = Date.now();
       const initialUserData = {
         profile: { name, timezone },
         points: { current: 0, total: 800 },
@@ -63,15 +100,29 @@ const Signup = () => {
         lastUpdated: now,
       };
 
-      await set(ref(database, `users/${userId}`), initialUserData);
+      // Write user data to the database
+      console.log("Attempting to write user data to path:", `users/${userId}`);
+      await set(ref(database, `users/${userId}`), initialUserData)
+        .then(() => {
+          console.log("User data written successfully");
+        })
+        .catch((error) => {
+          console.error("Failed to write user data:", error.message);
+          throw error;
+        });
+
+      // Cache user data in localStorage
       localStorage.setItem(
         `userData_${userId}`,
         JSON.stringify(initialUserData)
       );
+
+      // Navigate to dashboard
       await new Promise((resolve) => setTimeout(resolve, 500));
       navigate("/dashboard");
     } catch (error) {
-      alert(error.message);
+      console.error("Signup error:", error.message);
+      alert(`Failed to sign up: ${error.message}`);
     }
   };
 

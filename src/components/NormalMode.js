@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { auth } from "../firebase";
 import { useNormalModeLogic } from "./NormalModeLogic";
@@ -47,14 +47,16 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     sendGlobalNotification,
     submitFeedback,
     viewFeedback,
+    handleReadyChange,
+    resetAllUsersIsReady,
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "weekly");
 
   const [openAchievementSections, setOpenAchievementSections] = React.useState(
     {}
   );
-  const [adminSelectedTaskId, setAdminSelectedTaskId] = useState("");
-  const [adminSelectedBoost, setAdminSelectedBoost] = useState("");
-  const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = useState(false);
+  const [adminSelectedTaskId, setAdminSelectedTaskId] = React.useState("");
+  const [adminSelectedBoost, setAdminSelectedBoost] = React.useState("");
+  const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = React.useState(false);
 
   const showTaskDescription = (taskId) => {
     const task = globalTasks[taskId];
@@ -75,7 +77,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       syncWithFirebase(true);
     }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [syncWithFirebase]);
 
   const handleSaveProgress = async () => {
     try {
@@ -302,7 +304,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       lineHeight: "1.6",
       marginBottom: "20px",
     },
-
     tutorialButton: {
       backgroundColor: "#ffc107",
       color: "#000",
@@ -405,6 +406,10 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
   .nav-logout:hover {
     transform: scale(1.05);
     background: #dc3545;
+  }
+  .reset-is-ready-button:hover {
+    transform: scale(1.05);
+    background: linear-gradient(135deg, #c82333, #a71d2a);
   }
   `;
 
@@ -547,6 +552,20 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                           ).length
                         }
                       </span>
+                    </div>
+                    {/* Checkbox for isReady using handleReadyChange */}
+                    <div className="mt-3">
+                      <label className="d-flex align-items-center">
+                        <input
+                          type="checkbox"
+                          checked={userData.isReady}
+                          onChange={(e) => handleReadyChange(e.target.checked)}
+                          className="me-2"
+                        />
+                        <span className="text-muted small">
+                          Share my data with admin
+                        </span>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -775,9 +794,15 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                         </button>
                         <button
                           onClick={viewFeedback}
-                          className="mb-2 apply-global-boost-button"
+                          className="mb-2 apply-global-boost-button me-2"
                         >
                           View Feedback
+                        </button>
+                        <button
+                          onClick={resetAllUsersIsReady}
+                          className="mb-2 apply-global-boost-button reset-is-ready-button me-2"
+                        >
+                          Reset All Users IsReady
                         </button>
                       </div>
                     </div>

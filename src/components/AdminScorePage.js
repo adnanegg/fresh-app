@@ -31,7 +31,6 @@ const AdminScorePage = () => {
   const [scoreData, setScoreData] = useState([]);
   const [performanceData, setPerformanceData] = useState([]);
   const [taskAverages, setTaskAverages] = useState([]);
-  const [bestUsers, setBestUsers] = useState({});
   const isAdmin = auth.currentUser?.email === "admin@gmail.com";
 
   // Redirect non-admins
@@ -47,8 +46,19 @@ const AdminScorePage = () => {
     prayer_mosque: { key: "PrayerP", display: "Prayer" },
     sport_exercise: { key: "SportP", display: "Sport" },
     quran_listen: { key: "QuranListenP", display: "QuranListen" },
-    improvement_15min: { key: "Improvement15minP", display: "Improvement15min" },
+    improvement_15min: {
+      key: "Improvement15minP",
+      display: "Improvement15min",
+    },
     wake_up_early: { key: "WakeUpEarlyP", display: "WakeUpEarly" },
+  };
+
+  // Define performance goals for specific tasks
+  const taskGoals = {
+    Book: 70,
+    Quran: 80,
+    Sport: 70,
+    Prayer: 70,
   };
 
   const fetchAllUserData = async () => {
@@ -93,31 +103,38 @@ const AdminScorePage = () => {
 
       for (const userId in users) {
         const user = users[userId];
+        // Only process users where isReady is true
+        if (user.isReady !== true) continue;
         if (!user.profile || !user.points || !user.tasks) continue;
 
         // Calculate task percentages
-        const taskPercentages = Object.keys(taskKeyMap).reduce((acc, taskId) => {
-          const task = user.tasks[taskId] || {};
-          const globalTask = globalTasks[taskId] || {};
-          const percentage =
-            globalTask.numberLimit > 0
-              ? Math.round((task.completionCount / globalTask.numberLimit) * 100)
-              : 0;
-          const taskKey = taskKeyMap[taskId].key;
+        const taskPercentages = Object.keys(taskKeyMap).reduce(
+          (acc, taskId) => {
+            const task = user.tasks[taskId] || {};
+            const globalTask = globalTasks[taskId] || {};
+            const percentage =
+              globalTask.numberLimit > 0
+                ? Math.round(
+                    (task.completionCount / globalTask.numberLimit) * 100
+                  )
+                : 0;
+            const taskKey = taskKeyMap[taskId].key;
 
-          // Update best user if this percentage is higher
-          if (percentage > bestUsersTemp[taskKey].percentage) {
-            bestUsersTemp[taskKey] = {
-              username: user.profile.name || "User",
-              percentage,
+            // Update best user if this percentage is higher
+            if (percentage > bestUsersTemp[taskKey].percentage) {
+              bestUsersTemp[taskKey] = {
+                username: user.profile.name || "User",
+                percentage,
+              };
+            }
+
+            return {
+              ...acc,
+              [taskKey]: percentage,
             };
-          }
-
-          return {
-            ...acc,
-            [taskKey]: percentage,
-          };
-        }, {});
+          },
+          {}
+        );
 
         // Score chart data
         scoreChartData.push({
@@ -145,22 +162,20 @@ const AdminScorePage = () => {
         );
         return {
           task: taskId ? taskKeyMap[taskId].display : taskKey.replace("P", ""),
-          average: userCount > 0 ? (taskSums[taskKey] / userCount).toFixed(1) : 0,
+          average:
+            userCount > 0 ? (taskSums[taskKey] / userCount).toFixed(1) : 0,
         };
       });
 
       // Sort score data by score (descending) for chart
       scoreChartData.sort((a, b) => b.score - a.score);
 
-      // Debug logging
-      console.log("Task Sums:", taskSums);
+      // Debug: Log task averages for verification
       console.log("Task Averages:", taskAverageData);
-      console.log("Best Users:", bestUsersTemp);
 
       setScoreData(scoreChartData);
       setPerformanceData(performanceTableData);
       setTaskAverages(taskAverageData);
-      setBestUsers(bestUsersTemp);
 
       Swal.fire({
         icon: "success",
@@ -181,7 +196,6 @@ const AdminScorePage = () => {
     setScoreData([]);
     setPerformanceData([]);
     setTaskAverages([]);
-    setBestUsers({});
     Swal.fire({
       icon: "success",
       title: "Charts Cleared",
@@ -190,18 +204,49 @@ const AdminScorePage = () => {
   };
 
   // Find top and worst tasks
-  const topTask = taskAverages.length > 0
-    ? taskAverages.reduce((prev, curr) =>
-        parseFloat(curr.average) > parseFloat(prev.average) ? curr : prev
-      )
-    : { task: "N/A", average: 0 };
-  const worstTask = taskAverages.length > 0
-    ? taskAverages.reduce((prev, curr) =>
-        parseFloat(curr.average) < parseFloat(prev.average) ? curr : prev
-      )
-    : { task: "N/A", average: 0 };
+  const topTask =
+    taskAverages.length > 0
+      ? taskAverages.reduce((prev, curr) =>
+          parseFloat(curr.average) > parseFloat(prev.average) ? curr : prev
+        )
+      : { task: "N/A", average: 0 };
+  const worstTask =
+    taskAverages.length > 0
+      ? taskAverages.reduce((prev, curr) =>
+          parseFloat(curr.average) < parseFloat(prev.average) ? curr : prev
+        )
+      : { task: "N/A", average: 0 };
 
-  // Chart.js data and options (unchanged)
+  // Calculate overall performance (average of all task averages)
+  const overallPerformance =
+    taskAverages.length > 0
+      ? (
+          taskAverages.reduce(
+            (sum, task) => sum + parseFloat(task.average),
+            0
+          ) / taskAverages.length
+        ).toFixed(1)
+      : 0;
+
+  // Calculate task difficulty
+  const taskDifficulty = {
+    Easy: [],
+    Medium: [],
+    Hard: [],
+  };
+
+  taskAverages.forEach((task) => {
+    const avg = parseFloat(task.average);
+    if (avg > 80) {
+      taskDifficulty.Easy.push(task.task);
+    } else if (avg >= 50 && avg <= 80) {
+      taskDifficulty.Medium.push(task.task);
+    } else if (avg <= 30) {
+      taskDifficulty.Hard.push(task.task);
+    }
+  });
+
+  // Chart.js data and options
   const chartData = {
     labels: scoreData.map((item) => item.username),
     datasets: [
@@ -211,14 +256,14 @@ const AdminScorePage = () => {
         backgroundColor: scoreData.map((_, index) => {
           const ctx = document.createElement("canvas").getContext("2d");
           const gradient = ctx.createLinearGradient(0, 0, 200, 0);
-          gradient.addColorStop(0, "#4f46e5");
-          gradient.addColorStop(1, "#10b981");
+          gradient.addColorStop(0, "#a855f7"); // Purple
+          gradient.addColorStop(1, "#3b82f6"); // Blue
           return gradient;
         }),
         borderColor: "#ffffff",
         borderWidth: 2,
         barThickness: 20,
-        hoverBackgroundColor: scoreData.map(() => "#8b5cf6"),
+        hoverBackgroundColor: scoreData.map(() => "#ec4899"), // Pink on hover
       },
     ],
   };
@@ -291,22 +336,46 @@ const AdminScorePage = () => {
   };
 
   const styles = {
-    containerFluid: { padding: 0, overflow: "hidden" },
-    dashboardContent: {
-      marginTop: "70px",
-      padding: "10px",
-      flex: 1,
-    },
-    scoreFormCard: {
-      borderRadius: "12px",
-      background: "url('https://www.transparenttextures.com/patterns/parchment.jpg')",
-      border: "2px solid #d4a017",
-      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+    container: {
       padding: "20px",
-      marginTop: "10px",
-      width: "100%",
-      position: "relative",
+      marginTop: "60px",
+      maxWidth: "1200px",
+      marginLeft: "auto",
+      marginRight: "auto",
+    },
+    card: {
+      borderRadius: "12px",
+      boxShadow: "0 6px 16px rgba(0, 0, 0, 0.1)",
+      background: "linear-gradient(135deg, #ffffff, #f8f9fa)",
+      border: "2px solid #2dd4bf", // Teal border
+      transition: "transform 0.2s ease-in-out",
+    },
+    cardBody: {
+      padding: "20px",
+    },
+    title: {
+      fontSize: "1.5rem",
+      fontWeight: "bold",
+      marginBottom: "20px",
+      color: "#343a40",
+    },
+    progressContainer: {
+      maxWidth: "300px",
+      margin: "0 auto",
+    },
+    progressBar: {
+      height: "20px",
+      backgroundColor: "#e9ecef",
+      borderRadius: "4px",
       overflow: "hidden",
+    },
+    progressFill: {
+      height: "100%",
+      transition: "width 0.3s ease-in-out",
+    },
+    difficultyContainer: {
+      maxWidth: "600px",
+      margin: "0 auto",
     },
     videoBackground: {
       position: "fixed",
@@ -324,81 +393,274 @@ const AdminScorePage = () => {
       width: "100%",
       height: "100%",
       backgroundColor: "rgba(0, 0, 0, 0.02)",
-      zIndex: 0,
+      zIndex: -1,
     },
   };
 
   return (
-    <div style={styles.containerFluid}>
+    <div style={styles.container}>
       <video autoPlay loop muted style={styles.videoBackground}>
         <source src="/videos/backvideo2.mp4" type="video/mp4" />
         Your browser does not support the video tag.
       </video>
       <div style={styles.videoOverlay}></div>
 
-      <div
-        style={styles.dashboardContent}
-        className="container-fluid px-2 sm:px-4 md:px-10"
-      >
-        <div className="flex flex-col space-y-4">
-          <div style={styles.scoreFormCard} className="card shadow-sm">
-            <h3 className="text-center text-xl sm:text-2xl font-bold text-[#d4a017] mb-4">
-              Admin Score Dashboard
-            </h3>
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-4">
-              <button
-                onClick={fetchAllUserData}
-                className="btn btn-primary w-full sm:w-auto"
-              >
-                Fetch Data
-              </button>
-              <button
-                onClick={clearCharts}
-                className="btn btn-danger w-full sm:w-auto"
-              >
-                Clear Charts
-              </button>
-            </div>
+      <h2 style={styles.title} className="text-center mb-4">
+        <i
+          className="bi bi-graph-up-arrow me-2"
+          style={{ color: "#3b82f6" }}
+        ></i>
+        Admin Score Dashboard
+      </h2>
 
-            {/* Score Chart */}
-            {scoreData.length > 0 && (
-              <div
-                className="rounded-lg border-2 border-[#d4a017] w-full"
-                style={{
-                  height: window.innerWidth < 640 ? "400px" : "520px",
-                  backgroundColor: "white",
-                }}
-              >
-                <h4 className="text-center text-base sm:text-lg font-semibold mb-2">
-                  User Scores (Ranked)
-                </h4>
-                <Bar data={chartData} options={chartOptions} />
+      <div className="row g-4">
+        {/* First Row: Performance Overview and Task Difficulty */}
+        <div className="col-12 col-md-6">
+          <div
+            style={styles.card}
+            className="card h-100 hover:scale-105 transition-transform"
+          >
+            <div style={styles.cardBody}>
+              <h3 style={{ ...styles.title, fontSize: "1.25rem" }}>
+                <i
+                  className="bi bi-star-fill me-2"
+                  style={{ color: "#a855f7" }}
+                ></i>
+                Performance Overview
+              </h3>
+              <div className="space-y-2 text-center">
+                <p className="text-base sm:text-lg font-bold text-green-600">
+                  <i
+                    className="bi bi-trophy-fill mr-2"
+                    style={{ color: "#2dd4bf" }}
+                  ></i>
+                  Top Task: {topTask.task} ({topTask.average}%)
+                </p>
+                <p className="text-base sm:text-lg font-bold text-red-600">
+                  <i
+                    className="bi bi-exclamation-circle-fill mr-2"
+                    style={{ color: "#ec4899" }}
+                  ></i>
+                  Worst Task: {worstTask.task} ({worstTask.average}%)
+                </p>
+                <p className="text-base sm:text-lg font-bold text-blue-600">
+                  <i
+                    className="bi bi-bar-chart-fill mr-2"
+                    style={{ color: "#3b82f6" }}
+                  ></i>
+                  Overall Performance: {overallPerformance}%
+                </p>
               </div>
-            )}
+            </div>
+          </div>
+        </div>
+        <div className="col-12 col-md-6">
+          <div
+            style={styles.card}
+            className="card h-100 hover:scale-105 transition-transform"
+          >
+            <div style={styles.cardBody}>
+              <h3 style={{ ...styles.title, fontSize: "1.25rem" }}>
+                <i
+                  className="bi bi-speedometer2 me-2"
+                  style={{ color: "#f97316" }}
+                ></i>
+                Task Difficulty
+              </h3>
+              <div className="space-y-2 text-center">
+                <p className="text-base sm:text-lg">
+                  <span className="font-semibold text-green-600">
+                    <i
+                      className="bi bi-check-circle-fill mr-2"
+                      style={{ color: "#2dd4bf" }}
+                    ></i>
+                    Easy (&gt;80%):
+                  </span>{" "}
+                  {taskDifficulty.Easy.length > 0
+                    ? taskDifficulty.Easy.join(", ")
+                    : "None"}
+                </p>
+                <p className="text-base sm:text-lg">
+                  <span className="font-semibold text-yellow-600">
+                    <i
+                      className="bi bi-dash-circle-fill mr-2"
+                      style={{ color: "#f97316" }}
+                    ></i>
+                    Medium (50%–80%):
+                  </span>{" "}
+                  {taskDifficulty.Medium.length > 0
+                    ? taskDifficulty.Medium.join(", ")
+                    : "None"}
+                </p>
+                <p className="text-base sm:text-lg">
+                  <span className="font-semibold text-red-600">
+                    <i
+                      className="bi bi-x-circle-fill mr-2"
+                      style={{ color: "#ec4899" }}
+                    ></i>
+                    Hard (≤30%):
+                  </span>{" "}
+                  {taskDifficulty.Hard.length > 0
+                    ? taskDifficulty.Hard.join(", ")
+                    : "None"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Performance Table */}
-            {performanceData.length > 0 && (
-              <div>
-                <h4 className="text-center text-base sm:text-lg font-semibold mb-2">
-                  User Performances
-                </h4>
+      {/* Second Row: Weekly Performance Goals */}
+      {taskAverages.length > 0 && (
+        <div className="row mt-4">
+          <div className="col-12">
+            <div
+              style={styles.card}
+              className="card hover:scale-105 transition-transform"
+            >
+              <div style={styles.cardBody}>
+                <h3 style={{ ...styles.title, fontSize: "1.25rem" }}>
+                  <i
+                    className="bi bi-target me-2"
+                    style={{ color: "#a855f7" }}
+                  ></i>
+                  Weekly Performance Goals
+                </h3>
+                <div style={styles.progressContainer} className="space-y-4">
+                  {["Book", "Quran", "Sport", "Prayer"].map((taskName) => {
+                    const avg = parseFloat(
+                      taskAverages.find((t) => t.task === taskName)?.average ||
+                        0
+                    );
+                    const goal = taskGoals[taskName];
+                    const progress = Math.min((avg / goal) * 100, 100);
+                    console.log(
+                      `Task: ${taskName}, Avg: ${avg}, Goal: ${goal}, Progress: ${progress}%`
+                    );
+                    return (
+                      <div key={taskName} className="task-progress">
+                        <span className="block mb-1 text-sm">
+                          {taskName}: {avg.toFixed(1)}% / {goal}%
+                        </span>
+                        <div style={styles.progressBar}>
+                          <div
+                            style={{
+                              ...styles.progressFill,
+                              width: `${progress}%`,
+                              backgroundColor:
+                                avg >= goal ? "#2dd4bf" : "#f97316",
+                              ...styles.progressFill,
+                              width: `${progress}%`,
+                              backgroundColor:
+                                avg >= goal ? "#2dd4bf" : "#f97316",
+                            }}
+                            role="progressbar"
+                            aria-valuenow={progress}
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fetch and Clear Buttons */}
+      <div className="row mt-4">
+        <div className="col-12">
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mb-4">
+            <button
+              onClick={fetchAllUserData}
+              className="btn btn-primary w-full sm:w-auto"
+              style={{ backgroundColor: "#3b82f6", borderColor: "#3b82f6" }}
+            >
+              <i className="bi bi-cloud-download-fill me-2"></i>Fetch Data
+            </button>
+            <button
+              onClick={clearCharts}
+              className="btn btn-danger w-full sm:w-auto"
+              style={{ backgroundColor: "#ec4899", borderColor: "#ec4899" }}
+            >
+              <i className="bi bi-trash-fill me-2"></i>Clear Charts
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Score Chart */}
+      {scoreData.length > 0 && (
+        <div className="row mt-4">
+          <div className="col-12">
+            <div
+              style={styles.card}
+              className="card hover:scale-105 transition-transform"
+            >
+              <div style={styles.cardBody}>
+                <h3 style={{ ...styles.title, fontSize: "1.25rem" }}>
+                  <i
+                    className="bi bi-bar-chart-line-fill me-2"
+                    style={{ color: "#3b82f6" }}
+                  ></i>
+                  User Scores (Ranked)
+                </h3>
                 <div
-                  className="overflow-x-auto max-w-full"
-                  style={styles.scoreFormCard}
+                  style={{
+                    height: window.innerWidth < 640 ? "400px" : "520px",
+                  }}
                 >
-                  <table className="table w-full rounded-lg shadow-lg text-sm sm:text-base">
+                  <Bar data={chartData} options={chartOptions} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Performance Table */}
+      {performanceData.length > 0 && (
+        <div className="row mt-4">
+          <div className="col-12">
+            <div
+              style={styles.card}
+              className="card hover:scale-105 transition-transform"
+            >
+              <div style={styles.cardBody}>
+                <h3 style={{ ...styles.title, fontSize: "1.25rem" }}>
+                  <i
+                    className="bi bi-table me-2"
+                    style={{ color: "#a855f7" }}
+                  ></i>
+                  User Performances
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="table w-full table-bordered table-striped text-sm sm:text-base">
                     <thead>
-                      <tr className="bg-gradient-to-r from-yellow-500 to-yellow-700 text-white">
-                        <th className="py-2 sm:py-3 px-2 sm:px-4 rounded-tl-lg">
-                          Username
-                        </th>
+                      <tr
+                        style={{
+                          background:
+                            "linear-gradient(to right, #a855f7, #3b82f6)",
+                          color: "#ffffff",
+                        }}
+                      >
+                        <th className="py-2 sm:py-3 px-2 sm:px-4">Username</th>
                         <th className="py-2 sm:py-3 px-2 sm:px-4">Book (%)</th>
                         <th className="py-2 sm:py-3 px-2 sm:px-4">Quran (%)</th>
-                        <th className="py-2 sm:py-3 px-2 sm:px-4">Prayer (%)</th>
+                        <th className="py-2 sm:py-3 px-2 sm:px-4">
+                          Prayer (%)
+                        </th>
                         <th className="py-2 sm:py-3 px-2 sm:px-4">Sport (%)</th>
-                        <th className="py-2 sm:py-3 px-2 sm:px-4">Quran Listen (%)</th>
-                        <th className="py-2 sm:py-3 px-2 sm:px-4">Improvement (%)</th>
-                        <th className="py-2 sm:py-3 px-2 sm:px-4 rounded-tr-lg">
+                        <th className="py-2 sm:py-3 px-2 sm:px-4">
+                          Quran Listen (%)
+                        </th>
+                        <th className="py-2 sm:py-3 px-2 sm:px-4">
+                          Improvement (%)
+                        </th>
+                        <th className="py-2 sm:py-3 px-2 sm:px-4">
                           Wake Up (%)
                         </th>
                       </tr>
@@ -408,83 +670,100 @@ const AdminScorePage = () => {
                         <tr
                           key={index}
                           className={`${
-                            index % 2 === 0 ? "bg-yellow-50" : "bg-white"
-                          } hover:bg-yellow-100 transition-colors duration-200`}
+                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          } hover:bg-teal-100 transition-colors`}
                         >
                           <td className="py-2 sm:py-3 px-2 sm:px-4 font-semibold">
                             {user.username}
                           </td>
-                          <td className="py-2 sm:py-3 px-2 sm:px-4">{user.BookP}</td>
-                          <td className="py-2 sm:py-3 px-2 sm:px-4">{user.QuoranP}</td>
-                          <td className="py-2 sm:py-3 px-2 sm:px-4">{user.PrayerP}</td>
-                          <td className="py-2 sm:py-3 px-2 sm:px-4">{user.SportP}</td>
-                          <td className="py-2 sm:py-3 px-2 sm:px-4">{user.QuranListenP}</td>
-                          <td className="py-2 sm:py-3 px-2 sm:px-4">{user.Improvement15minP}</td>
-                          <td className="py-2 sm:py-3 px-2 sm:px-4">{user.WakeUpEarlyP}</td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {user.BookP}
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {user.QuoranP}
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {user.PrayerP}
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {user.SportP}
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {user.QuranListenP}
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {user.Improvement15minP}
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {user.WakeUpEarlyP}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               </div>
-            )}
+            </div>
+          </div>
+        </div>
+      )}
 
-            {/* Task Averages Table */}
-            {taskAverages.length > 0 && (
-              <div>
-                <h4 className="text-center text-base sm:text-lg font-semibold mb-2">
+      {/* Task Averages Table */}
+      {taskAverages.length > 0 && (
+        <div className="row mt-4">
+          <div className="col-12">
+            <div
+              style={styles.card}
+              className="card hover:scale-105 transition-transform"
+            >
+              <div style={styles.cardBody}>
+                <h3 style={{ ...styles.title, fontSize: "1.25rem" }}>
+                  <i
+                    className="bi bi-pie-chart-fill me-2"
+                    style={{ color: "#ec4899" }}
+                  ></i>
                   Task Average Performance
-                </h4>
-                <div
-                  className="mb-4 flex flex-col sm:flex-row justify-center gap-4 sm:gap-6"
-                  style={styles.scoreFormCard}
-                >
-                  <div className="text-center">
-                    <p className="text-lg sm:text-xl font-bold text-green-600">
-                      <i className="bi bi-trophy-fill mr-2"></i> Top Task: {topTask.task} (
-                      {topTask.average}%)
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg sm:text-xl font-bold text-red-600">
-                      <i className="bi bi-exclamation-triangle-fill mr-2"></i> Worst Task:{" "}
-                      {worstTask.task} ({worstTask.average}%)
-                    </p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto max-w-full">
+                </h3>
+                <div className="overflow-x-auto">
                   <table className="table w-full table-bordered table-striped text-sm sm:text-base">
                     <thead>
-                      <tr>
+                      <tr
+                        style={{
+                          background:
+                            "linear-gradient(to right, #f97316, #ec4899)",
+                          color: "#ffffff",
+                        }}
+                      >
                         <th className="py-2 sm:py-3 px-2 sm:px-4">Task</th>
-                        <th className="py-2 sm:py-3 px-2 sm:px-4">Average Performance (%)</th>
-                        <th className="py-2 sm:py-3 px-2 sm:px-4">Best User</th>
+                        <th className="py-2 sm:py-3 px-2 sm:px-4">
+                          Average Performance (%)
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {taskAverages.map((task, index) => {
-                        const taskKey = Object.values(taskKeyMap).find(
-                          (t) => t.display === task.task
-                        )?.key || `${task.task}P`;
-                        return (
-                          <tr key={index}>
-                            <td className="py-2 sm:py-3 px-2 sm:px-4">{task.task}</td>
-                            <td className="py-2 sm:py-3 px-2 sm:px-4">{task.average}</td>
-                            <td className="py-2 sm:py-3 px-2 sm:px-4">
-                              {bestUsers[taskKey]?.username || "N/A"} (
-                              {bestUsers[taskKey]?.percentage || 0}%)
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {taskAverages.map((task, index) => (
+                        <tr
+                          key={index}
+                          className={`${
+                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          } hover:bg-teal-100 transition-colors`}
+                        >
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {task.task}
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {task.average}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

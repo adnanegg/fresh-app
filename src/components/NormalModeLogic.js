@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { auth, database } from "../firebase";
-import { signOut } from "firebase/auth";
+import { signOut, getAuth } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
-import { ref, get, update } from "firebase/database";
+import { ref, get, update, getDatabase } from "firebase/database";
 import Swal from "sweetalert2";
 
 const BOOSTS = {
@@ -98,6 +98,7 @@ export const useNormalModeLogic = (
         : [],
       achievements: parsedData.achievements || {},
       lastUpdated: parsedData.lastUpdated || Date.now(),
+      isReady: parsedData.isReady || false,
     };
   });
   const [notifications, setNotifications] = useState([]);
@@ -259,6 +260,7 @@ export const useNormalModeLogic = (
           lastUpdated: firebaseData.lastUpdated || Date.now(),
           mode: firebaseData.preferences?.mode || "daily",
           currentWeek: firebaseData.currentWeek || 1,
+          isReady: firebaseData.isReady ?? false,
         };
 
         localStorage.setItem(
@@ -288,6 +290,42 @@ export const useNormalModeLogic = (
       const updatedData = { ...userData, ...newData, lastUpdated: Date.now() };
       localStorage.setItem(`userData_${userId}`, JSON.stringify(updatedData));
       setUserData(updatedData);
+    },
+    [userData, userId]
+  );
+
+  const handleReadyChange = useCallback(
+    async (isChecked) => {
+      try {
+        // Update local state and localStorage
+        const updatedData = {
+          ...userData,
+          isReady: isChecked,
+          lastUpdated: Date.now(),
+        };
+        localStorage.setItem(`userData_${userId}`, JSON.stringify(updatedData));
+        setUserData(updatedData);
+
+        // Sync with Firebase
+        await update(ref(database, `users/${userId}`), {
+          isReady: isChecked,
+          lastUpdated: Date.now(),
+        });
+
+        Swal.fire({
+          icon: "success",
+          title: "Ready Status Updated",
+          text: `You are now ${isChecked ? "ready" : "not ready"}.`,
+          timer: 1500,
+        });
+      } catch (error) {
+        console.error("Failed to update isReady in Firebase:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Update Failed",
+          text: "Failed to save ready status to server. Status saved locally.",
+        });
+      }
     },
     [userData, userId]
   );
@@ -1406,6 +1444,62 @@ export const useNormalModeLogic = (
     }
   }, []);
 
+  const resetAllUsersIsReady = async () => {
+    const auth = getAuth();
+    const database = getDatabase();
+    const user = auth.currentUser;
+
+    // Check if the user is the admin
+    if (!user || user.email !== "admin@gmail.com") {
+      Swal.fire({
+        icon: "error",
+        title: "Unauthorized",
+        text: "Only the admin can reset all users' isReady status.",
+      });
+      return;
+    }
+
+    try {
+      // Fetch all users from the 'users' node
+      const usersRef = ref(database, "users");
+      const usersSnapshot = await get(usersRef);
+
+      if (!usersSnapshot.exists()) {
+        Swal.fire({
+          icon: "warning",
+          title: "No Users Found",
+          text: "There are no users to reset.",
+        });
+        return;
+      }
+
+      const updates = {};
+      // Iterate through all users and set isReady to false
+      usersSnapshot.forEach((userSnapshot) => {
+        const userId = userSnapshot.key;
+        // No need to check if isReady exists; Firebase update will create it if missing
+        updates[`users/${userId}/isReady`] = false;
+      });
+
+      // Perform batch update
+      await update(ref(database), updates);
+
+      Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "All users' isReady status has been reset to false.",
+        timer: 1500,
+      });
+    } catch (error) {
+      console.error("Failed to reset all users' isReady:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Failed",
+        text: "Could not reset users' isReady status. Please try again.",
+      });
+    }
+  };
+
   const viewFeedback = useCallback(async () => {
     try {
       Swal.fire({
@@ -1510,5 +1604,7 @@ export const useNormalModeLogic = (
     sendGlobalNotification,
     submitFeedback,
     viewFeedback,
+    handleReadyChange,
+    resetAllUsersIsReady,
   };
 };
