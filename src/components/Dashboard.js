@@ -15,7 +15,6 @@ const Dashboard = () => {
   const userId = auth.currentUser?.uid;
 
   const [userProfile, setUserProfile] = useState({ name: "" });
-  const [readyUsersCount, setReadyUsersCount] = useState(0);
   const [pointsData, setPointsData] = useState({ current: 0, total: 800 });
   const [MpointsData, setMpointsData] = useState({ current: 0, total: 2800 });
   const [achievementsData, setAchievementsData] = useState({});
@@ -78,7 +77,6 @@ const Dashboard = () => {
 
   const fetchUserData = useCallback(async (userId) => {
     try {
-      // MODIFIED: Replaced usersSnap with isReadyCountsSnap
       const queries = [
         get(ref(database, `users/${userId}/profile`)),
         get(ref(database, `users/${userId}/points`)),
@@ -88,11 +86,6 @@ const Dashboard = () => {
         get(ref(database, "globalTasks")),
       ];
 
-      // Only fetch isReadyCounts if the user is admin
-      if (auth.currentUser?.email === "admin@gmail.com") {
-        queries.push(get(ref(database, "isReadyCounts")));
-      }
-
       const [
         profileSnap,
         pointsSnap,
@@ -100,7 +93,6 @@ const Dashboard = () => {
         achievementsSnap,
         tasksSnap,
         globalTasksSnap,
-        isReadyCountsSnap, // This will be undefined for non-admins
       ] = await Promise.all(queries);
 
       const firebaseData = {
@@ -114,18 +106,10 @@ const Dashboard = () => {
 
       const globalTasks = globalTasksSnap.val() || {};
 
-      // MODIFIED: Count ready users from isReadyCounts
-      let readyCount = 0;
-      if (auth.currentUser?.email === "admin@gmail.com") {
-        const isReadyCounts = isReadyCountsSnap.val() || {};
-        readyCount = Object.keys(isReadyCounts).length; // NEW: Count UIDs in isReadyCounts
-      }
-
       setUserProfile(firebaseData.profile);
       setPointsData(firebaseData.points);
       setMpointsData(firebaseData.Mpoints);
       setAchievementsData(firebaseData.achievements);
-      setReadyUsersCount(readyCount); // Set ready users count for admin
 
       const taskPercentages = [
         "book_read",
@@ -186,7 +170,6 @@ const Dashboard = () => {
         setPointsData(cachedUserData.points || { current: 0, total: 800 });
         setMpointsData(cachedUserData.Mpoints || { current: 0, total: 2800 });
         setAchievementsData(cachedUserData.achievements || {});
-        setReadyUsersCount(0); // NEW: Reset readyUsersCount in cache fallback
 
         const cachedTaskPercentages = [
           "book_read",
@@ -950,16 +933,6 @@ const Dashboard = () => {
       borderRadius: "4px",
       cursor: "pointer",
     },
-    readyUsersCard: {
-      textAlign: "center",
-      padding: "15px",
-      borderRadius: "8px",
-      background: "linear-gradient(135deg, #28a745, #007bff)",
-      boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-      transition: "background 0.3s ease, transform 0.3s ease",
-      position: "relative",
-      overflow: "hidden",
-    },
   };
 
   const stylesString = `
@@ -1053,47 +1026,6 @@ const Dashboard = () => {
       </div>
 
       <div style={styles.dashboardContent} className="container-fluid">
-        {isAdmin && (
-          <div className="mb-4">
-            <div style={styles.dashboardCard} className="card shadow-sm mb-3">
-              <div style={styles.cardBody} className="p-3 text-center">
-                <h6
-                  style={styles.cardTitle}
-                  className="card-title text-primary mb-2"
-                >
-                  Ready Users
-                </h6>
-                <div style={styles.pointsProgress}>
-                  <i
-                    className="bi bi-check-circle-fill"
-                    style={{
-                      ...styles.progressIcon,
-                      color: "#28a745",
-                    }}
-                  />
-                  <p style={styles.progressText}>
-                    {readyUsersCount} User{readyUsersCount !== 1 ? "s" : ""}{" "}
-                    Ready
-                  </p>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={submitAllUserForms}
-              className="btn btn-danger w-100 mb-2"
-              style={{ padding: "10px", position: "relative", zIndex: 100 }}
-            >
-              <i className="bi bi-send-fill me-2"></i>Submit All Weekly Data
-            </button>
-            <button
-              onClick={submitAllUserMonthlyForms}
-              className="btn btn-danger w-100"
-              style={{ padding: "10px", position: "relative", zIndex: 100 }}
-            >
-              <i className="bi bi-send-fill me-2"></i>Submit All Monthly Data
-            </button>
-          </div>
-        )}
         {isAdmin && (
           <div className="mb-4">
             <button

@@ -1,10 +1,16 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { auth, database } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import { ref, get } from "firebase/database";
 import Swal from "sweetalert2";
+import Chart from "chart.js/auto";
+import ChartDataLabels from "chartjs-plugin-datalabels";
+import Annotation from "chartjs-plugin-annotation";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
+
+// Register plugins
+Chart.register(ChartDataLabels, Annotation);
 
 const Statistics = () => {
   const navigate = useNavigate();
@@ -15,6 +21,9 @@ const Statistics = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [overallPerf, setOverallPerf] = useState(0);
   const [creationDate, setCreationDate] = useState("");
+  const [weeklyPerformanceData, setWeeklyPerformanceData] = useState({});
+  const overallChartRef = useRef(null);
+  const taskChartRefs = useRef([]);
 
   const fetchGlobalTasks = useCallback(async () => {
     const cachedGlobalTasks = JSON.parse(localStorage.getItem("globalTasks"));
@@ -37,13 +46,19 @@ const Statistics = () => {
           await fetchGlobalTasks();
         }
 
-        const [tasksSnap, completedSnap, weekSnap, metadataSnap] =
-          await Promise.all([
-            get(ref(database, `users/${userId}/tasks`)),
-            get(ref(database, `users/${userId}/completedTasks`)),
-            get(ref(database, `users/${userId}/currentWeek`)),
-            get(ref(database, `users/${userId}/metadata`)),
-          ]);
+        const [
+          tasksSnap,
+          completedSnap,
+          weekSnap,
+          metadataSnap,
+          weeklyPerfSnap,
+        ] = await Promise.all([
+          get(ref(database, `users/${userId}/tasks`)),
+          get(ref(database, `users/${userId}/completedTasks`)),
+          get(ref(database, `users/${userId}/currentWeek`)),
+          get(ref(database, `users/${userId}/metadata`)),
+          get(ref(database, `users/${userId}/weeklyPerformance`)),
+        ]);
 
         const userTasks = tasksSnap.val() || {};
         const mergedTasks = Object.keys(globalTasks).map((taskId) => {
@@ -64,7 +79,6 @@ const Statistics = () => {
         setTasks(filteredTasks);
         setCompletedTasks(completedSnap.val() || []);
 
-        // Ensure currentWeek is at least 1
         const weekNumber = weekSnap.val() || 1;
         setCurrentWeek(weekNumber);
 
@@ -81,13 +95,12 @@ const Statistics = () => {
           );
         }
 
-        // Overall Performance
         const totalCompletion = filteredTasks.reduce(
           (sum, task) => sum + (task.lifetimeCompletionCount || 0),
           0
         );
         const totalPossible = filteredTasks.reduce(
-          (sum, task) => sum + ((task.numberLimit || 0) * weekNumber),
+          (sum, task) => sum + (task.numberLimit || 0) * weekNumber,
           0
         );
         setOverallPerf(
@@ -96,7 +109,8 @@ const Statistics = () => {
             : 0
         );
 
-        // Debugging: Log values to verify
+        setWeeklyPerformanceData(weeklyPerfSnap.val() || {});
+
         console.log({
           weekNumber,
           totalCompletion,
@@ -107,6 +121,7 @@ const Statistics = () => {
             numberLimit: t.numberLimit,
             totalPossible: t.numberLimit * weekNumber,
           })),
+          weeklyPerformanceData: weeklyPerfSnap.val(),
         });
       } catch (error) {
         console.error("Fetch error:", error);
@@ -156,7 +171,6 @@ const Statistics = () => {
       : 0;
   }, [completedTasks, tasks]);
 
-  // Additional Stats
   const taskCompletionRate = tasks.length
     ? Math.round(
         (tasks.filter((t) => (t.lifetimeCompletionCount || 0) > 0).length /
@@ -187,6 +201,279 @@ const Statistics = () => {
 
   const weeksActive = currentWeek - 1;
 
+  // Diverse color palette for tasks
+  const taskColors = [
+    "#1E90FF", // Dodger Blue
+    "#32CD32", // Lime Green
+    "#FF4500", // Orange Red
+    "#b09900", // Gold
+    "#9932CC", // Dark Orchid
+    "#00CED1", // Dark Turquoise
+    "#FF69B4", // Hot Pink
+    "#883b2d", // Saddle Brown
+  ];
+
+  // Calculate previous week comparison for tasks
+  const getWeekComparison = (task) => {
+    if (currentWeek <= 2) return null;
+    const lastWeekKey = (currentWeek - 1).toString();
+    const prevWeekKey = (currentWeek - 2).toString();
+    const lastPerf =
+      weeklyPerformanceData[lastWeekKey]?.[task.taskId]?.performance || 0;
+    const prevPerf =
+      weeklyPerformanceData[prevWeekKey]?.[task.taskId]?.performance || 0;
+    const diff = lastPerf - prevPerf;
+    if (diff === 0 || isNaN(diff)) return null;
+    const absDiff = Math.abs(diff);
+    return {
+      isImprovement: diff > 0,
+      percentage: absDiff.toFixed(1),
+    };
+  };
+
+  // Calculate previous week comparison for overall performance
+  const getOverallWeekComparison = () => {
+    if (currentWeek <= 2) return null;
+    const lastWeekKey = (currentWeek - 1).toString();
+    const prevWeekKey = (currentWeek - 2).toString();
+    const lastPerf = weeklyPerformanceData[lastWeekKey]?.overall || 0;
+    const prevPerf = weeklyPerformanceData[prevWeekKey]?.overall || 0;
+    const diff = lastPerf - prevPerf;
+    if (diff === 0 || isNaN(diff)) return null;
+    const absDiff = Math.abs(diff);
+    return {
+      isImprovement: diff > 0,
+      percentage: absDiff.toFixed(1),
+    };
+  };
+
+  useEffect(() => {
+    if (isLoading || Object.keys(weeklyPerformanceData).length === 0) return;
+
+    // Destroy existing charts
+    if (overallChartRef.current) {
+      overallChartRef.current.destroy();
+      overallChartRef.current = null;
+    }
+    taskChartRefs.current.forEach((chart) => {
+      if (chart) chart.destroy();
+    });
+    taskChartRefs.current = [];
+
+    // Overall Performance Chart
+    const overallCanvas = document.getElementById("overallPerformanceChart");
+    if (overallCanvas) {
+      const overallCtx = overallCanvas.getContext("2d");
+      overallChartRef.current = new Chart(overallCtx, {
+        type: "line",
+        data: {
+          labels: Object.keys(weeklyPerformanceData).map(
+            (week) => `Week ${week}`
+          ),
+          datasets: [
+            {
+              label: "Overall Weekly Performance (%)",
+              data: Object.values(weeklyPerformanceData).map(
+                (data) => data.overall || 0
+              ),
+              borderColor: "#1E90FF",
+              fill: false,
+              tension: 0,
+              pointRadius: 6,
+              pointHoverRadius: 8,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 120,
+              title: {
+                display: true,
+                text: "Performance (%)",
+                font: { size: 14 },
+              },
+              ticks: { font: { size: 14 }, stepSize: 5 },
+            },
+            x: {
+              title: { display: true, text: "Week", font: { size: 14 } },
+              ticks: { font: { size: 14 } },
+              offset: true,
+            },
+          },
+          layout: {
+            padding: 20,
+          },
+          plugins: {
+            legend: { display: true },
+            tooltip: {
+              callbacks: {
+                label: (context) => `${context.dataset.label}: ${context.raw}%`,
+              },
+            },
+            datalabels: {
+              display: true,
+              formatter: (value) => `${value}%`,
+              color: "#000",
+              font: { size: 14 },
+              anchor: "end",
+              align: "top",
+            },
+            annotation: {
+              annotations: {
+                line1: {
+                  type: "line",
+                  yMin: 100,
+                  yMax: 100,
+                  borderColor: "#808080",
+                  borderWidth: 2,
+                  borderDash: [5, 5],
+                  label: {
+                    content: "100% Cap",
+                    enabled: true,
+                    position: "start",
+                    backgroundColor: "rgba(128, 128, 128, 0.7)",
+                    font: { size: 12 },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    } else {
+      console.error("Overall performance chart canvas not found");
+    }
+
+    // Task Performance Charts (2 tasks per chart, max 4 charts)
+    const maxTasks = 8;
+    const tasksPerChart = 2;
+    const taskGroups = [];
+    for (let i = 0; i < Math.min(tasks.length, maxTasks); i += tasksPerChart) {
+      taskGroups.push(tasks.slice(i, i + tasksPerChart));
+    }
+
+    taskGroups.forEach((group, groupIndex) => {
+      const canvas = document.getElementById(
+        `taskPerformanceChart${groupIndex}`
+      );
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        const chart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: Object.keys(weeklyPerformanceData).map(
+              (week) => `Week ${week}`
+            ),
+            datasets: group.map((task, index) => ({
+              label: task.name,
+              data: Object.values(weeklyPerformanceData).map(
+                (data) => data[task.taskId]?.performance || 0
+              ),
+              borderColor:
+                taskColors[
+                  (groupIndex * tasksPerChart + index) % taskColors.length
+                ],
+              fill: false,
+              tension: 0,
+              pointRadius: 6,
+              pointHoverRadius: 8,
+            })),
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 120,
+                title: {
+                  display: true,
+                  text: "Performance (%)",
+                  font: { size: 14 },
+                },
+                ticks: { font: { size: 14 }, stepSize: 5 },
+              },
+              x: {
+                title: { display: true, text: "Week", font: { size: 14 } },
+                ticks: { font: { size: 14 } },
+                offset: true,
+              },
+            },
+            layout: {
+              padding: 20,
+            },
+            plugins: {
+              legend: { display: true },
+              tooltip: {
+                callbacks: {
+                  label: (context) =>
+                    `${context.dataset.label}: ${context.raw}%`,
+                },
+              },
+              datalabels: {
+                display: (context) => {
+                  // First task: show name at first point; second task: show name at last point
+                  if (context.datasetIndex === 0) {
+                    return context.dataIndex === 0;
+                  }
+                  if (context.datasetIndex === 1) {
+                    return (
+                      context.dataIndex === context.dataset.data.length - 1
+                    );
+                  }
+                  return false;
+                },
+                formatter: (value, context) => context.dataset.label,
+                color: (context) => context.dataset.borderColor,
+                font: { size: 14, weight: "bold" },
+                anchor: (context) =>
+                  context.datasetIndex === 0 ? "start" : "end",
+                align: (context) =>
+                  context.datasetIndex === 0 ? "start" : "end",
+                offset: 10,
+              },
+              annotation: {
+                annotations: {
+                  line1: {
+                    type: "line",
+                    yMin: 100,
+                    yMax: 100,
+                    borderColor: "#808080",
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    label: {
+                      content: "100% Cap",
+                      enabled: true,
+                      position: "start",
+                      backgroundColor: "rgba(128, 128, 128, 0.7)",
+                      font: { size: 12 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+        taskChartRefs.current[groupIndex] = chart;
+      } else {
+        console.error(`Task performance chart ${groupIndex} canvas not found`);
+      }
+    });
+
+    return () => {
+      if (overallChartRef.current) {
+        overallChartRef.current.destroy();
+        overallChartRef.current = null;
+      }
+      taskChartRefs.current.forEach((chart) => {
+        if (chart) chart.destroy();
+      });
+      taskChartRefs.current = [];
+    };
+  }, [weeklyPerformanceData, tasks, isLoading]);
+
   const styles = {
     container: {
       padding: "20px",
@@ -210,6 +497,14 @@ const Statistics = () => {
     statItem: { marginBottom: "15px", fontSize: "1.1rem", color: "#495057" },
     statValue: { fontWeight: "bold", color: "#007bff" },
   };
+
+  // Generate task chart sections dynamically
+  const maxTasks = 8;
+  const tasksPerChart = 2;
+  const taskGroups = [];
+  for (let i = 0; i < Math.min(tasks.length, maxTasks); i += tasksPerChart) {
+    taskGroups.push(tasks.slice(i, i + tasksPerChart));
+  }
 
   return (
     <div style={styles.container}>
@@ -241,6 +536,23 @@ const Statistics = () => {
                     <i className="bi bi-calendar-week text-primary me-2"></i>
                     Weekly Performance:{" "}
                     <span style={styles.statValue}>{weeklyPerformance()}%</span>
+                    {getOverallWeekComparison() && (
+                      <span
+                        style={{
+                          color: getOverallWeekComparison().isImprovement
+                            ? "green"
+                            : "red",
+                          marginLeft: "10px",
+                          fontSize: "0.9rem",
+                        }}
+                        title={`Week ${currentWeek - 1} vs. Week ${
+                          currentWeek - 2
+                        }`}
+                      >
+                        {getOverallWeekComparison().isImprovement ? "+" : "-"}
+                        {getOverallWeekComparison().percentage}%
+                      </span>
+                    )}
                   </p>
                   <p style={styles.statItem}>
                     <i className="bi bi-check-circle-fill text-success me-2"></i>
@@ -312,6 +624,7 @@ const Statistics = () => {
                                 100
                             )
                           : 0;
+                        const comparison = getWeekComparison(task);
                         return (
                           <li
                             key={index}
@@ -324,11 +637,28 @@ const Statistics = () => {
                                 Overall: {taskOverallPerf}% (
                                 {totalTaskCompletion}/{totalTaskPossible})
                               </span>
-                              <span className="badge bg-success">
+                              <span className="badge bg-info me-2">
                                 Week: {weeklyPerf}% (
                                 {weeklyTask?.completionCount || 0}/
                                 {task.numberLimit})
                               </span>
+                              {comparison && (
+                                <span
+                                  style={{
+                                    color: comparison.isImprovement
+                                      ? "green"
+                                      : "red",
+                                    marginLeft: "10px",
+                                    fontSize: "0.9rem",
+                                  }}
+                                  title={`Week ${currentWeek - 1} vs. Week ${
+                                    currentWeek - 2
+                                  }`}
+                                >
+                                  {comparison.isImprovement ? "+" : "-"}
+                                  {comparison.percentage}%
+                                </span>
+                              )}
                             </span>
                           </li>
                         );
@@ -337,6 +667,55 @@ const Statistics = () => {
                   ) : (
                     <p className="text-muted">
                       No tasks available in the 'Tasks' category.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="row mt-4">
+            <div className="col-12">
+              <div style={styles.card} className="card">
+                <div style={styles.cardBody}>
+                  <h3 style={{ ...styles.title, fontSize: "1.25rem" }}>
+                    Weekly Performance Trends
+                  </h3>
+                  {Object.keys(weeklyPerformanceData).length > 0 ? (
+                    <>
+                      <div className="mb-4">
+                        <h4 style={{ fontSize: "1.1rem", color: "#495057" }}>
+                          Overall Weekly Performance
+                        </h4>
+                        <canvas
+                          id="overallPerformanceChart"
+                          height="100"
+                        ></canvas>
+                      </div>
+                      {taskGroups.map((group, groupIndex) => {
+                        const startTask = groupIndex * tasksPerChart + 1;
+                        const endTask = Math.min(
+                          startTask + tasksPerChart - 1,
+                          tasks.length
+                        );
+                        return (
+                          <div key={groupIndex} className="mb-4">
+                            <h4
+                              style={{ fontSize: "1.1rem", color: "#495057" }}
+                            >
+                              Task Weekly Performance (Tasks {startTask}–
+                              {endTask})
+                            </h4>
+                            <canvas
+                              id={`taskPerformanceChart${groupIndex}`}
+                              height="100"
+                            ></canvas>
+                          </div>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <p className="text-muted">
+                      No weekly performance data available.
                     </p>
                   )}
                 </div>

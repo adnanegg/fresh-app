@@ -250,7 +250,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       transform: "translate(-50%, -50%)",
       width: "90%",
       maxHeight: "80vh",
-      background: "black",
+      background: "white",
       padding: "20px",
       borderRadius: "8px",
       boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
