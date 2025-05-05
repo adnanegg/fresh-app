@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { auth, database } from "../firebase";
 import { signOut, getAuth } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
-import { ref, get, update, getDatabase } from "firebase/database";
+import { ref, get, update, getDatabase, onValue } from "firebase/database";
 import Swal from "sweetalert2";
 
 const BOOSTS = {
@@ -261,6 +261,7 @@ export const useNormalModeLogic = (
           mode: firebaseData.preferences?.mode || "daily",
           currentWeek: firebaseData.currentWeek || 1,
           isReady: firebaseData.isReady ?? false,
+          adminMessage: firebaseData.adminMessage || "",
         };
 
         localStorage.setItem(
@@ -284,6 +285,31 @@ export const useNormalModeLogic = (
     initializeUserData();
     return () => syncWithFirebase(true);
   }, [navigate, userId, globalTasks]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const adminMessageRef = ref(database, `users/${userId}/adminMessage`);
+    const unsubscribe = onValue(
+      adminMessageRef,
+      (snapshot) => {
+        const adminMessage = snapshot.val() || "";
+        setUserData((prev) => {
+          const updatedData = { ...prev, adminMessage };
+          localStorage.setItem(
+            `userData_${userId}`,
+            JSON.stringify(updatedData)
+          );
+          return updatedData;
+        });
+      },
+      (error) => {
+        console.error("Error fetching adminMessage:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [userId]);
 
   const updateLocalData = useCallback(
     (newData) => {

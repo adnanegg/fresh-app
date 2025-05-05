@@ -50,11 +50,11 @@ const Dashboard = () => {
   const taskGoals = {
     Book: 70,
     Quran: 70,
-    Sport: 70,
     Prayer: 70,
-    QuranListen: 70,
+    Sport: 70,
+    "Quran Listen": 70,
     Improvement: 70,
-    WakeUp: 70,
+    "Wake Up": 70,
   };
 
   useEffect(() => {
@@ -1007,9 +1007,14 @@ const Dashboard = () => {
             <i className="bi bi-star-fill"></i> Program
           </Link>
           {isAdmin && (
-            <Link to="/admin-scores" className="nav-link">
-              <i className="bi bi-bar-chart-fill"></i> Admin Scores
-            </Link>
+            <>
+              <Link to="/admin-scores" className="nav-link">
+                <i className="bi bi-bar-chart-fill"></i> Admin Scores
+              </Link>
+              <Link to="/admin-dashboard" className="nav-link">
+                <i className="bi bi-person-fill-gear"></i> Admin Dashboard
+              </Link>
+            </>
           )}
         </div>
         <button
@@ -1040,10 +1045,16 @@ const Dashboard = () => {
           Statistics
         </Link>
         {isAdmin && (
-          <Link to="/admin-scores" style={styles.mobileNavLink}>
-            <i className="bi bi-bar-chart-fill" style={styles.navIcon}></i>{" "}
-            Admin Scores
-          </Link>
+          <>
+            <Link to="/admin-scores" style={styles.mobileNavLink}>
+              <i className="bi bi-bar-chart-fill" style={styles.navIcon}></i>{" "}
+              Admin Scores
+            </Link>
+            <Link to="/admin-dashboard" style={styles.mobileNavLink}>
+              <i className="bi bi-person-fill-gear" style={styles.navIcon}></i>{" "}
+              Admin Dashboard
+            </Link>
+          </>
         )}
         <button onClick={handleLogout} style={styles.logoutButton}>
           <i className="bi bi-box-arrow-right" style={styles.navIcon}></i>{" "}

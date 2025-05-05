@@ -5,9 +5,9 @@ import {
   onAuthStateChanged,
   updatePassword,
   setPersistence,
-  browserLocalPersistence, // Add this import
+  browserLocalPersistence,
 } from "firebase/auth";
-import { ref, get } from "firebase/database";
+import { ref, get, set } from "firebase/database"; // Add 'set' import
 import { useNavigate, Link } from "react-router-dom";
 import "./styles/Login.css";
 import Swal from "sweetalert2";
@@ -36,6 +36,10 @@ const Login = () => {
         password
       );
       const userId = userCredential.user.uid;
+
+      // Update lastLogin timestamp
+      const timestamp = new Date().toISOString();
+      await set(ref(database, `users/${userId}/lastLogin`), timestamp);
 
       await cacheAndVerifyData(userId);
 

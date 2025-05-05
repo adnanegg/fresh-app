@@ -44,6 +44,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
     submitFeedback,
     isReady,
     setIsReady,
+    handleReadyChange,
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "weekly");
 
   const [openAchievementSections, setOpenAchievementSections] = React.useState(
@@ -294,6 +295,18 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
       marginLeft: "5px",
       verticalAlign: "middle",
     },
+    importantSection: {
+      marginBottom: "20px",
+      border: "2px solid #dc3545",
+      borderRadius: "8px",
+      background: "rgba(255, 245, 245, 0.9)",
+    },
+    importantMessage: {
+      fontSize: "16px",
+      color: "#dc3545",
+      padding: "10px",
+      textAlign: "center",
+    },
   };
 
   const stylesString = `
@@ -418,7 +431,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
             className="nav-link switch-button"
             title="Switch to Daily Mode"
           >
-            <i className="bi bi-arrow-repeat me-2"></i>Daily Mode
+            <i className="bi bi-arrow-repeat me-2"></i>Switch to Daily Mode
           </button>
           <button onClick={handleLogout} className="nav-logout">
             <i className="bi bi-box-arrow-right"></i> Logout
@@ -493,6 +506,42 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                           }
                         </span>
                       </div>
+                      <div className="mt-3">
+                        <label className="d-flex align-items-center">
+                          <input
+                            type="checkbox"
+                            checked={userData.isReady}
+                            onChange={(e) =>
+                              handleReadyChange(e.target.checked)
+                            }
+                            className="me-2"
+                          />
+                          <span className="text-muted small">
+                            Share my data with admin
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Important Section */}
+            <div className="row mb-4">
+              <div className="col-12">
+                <div style={styles.dashboardCard} className="card shadow-sm">
+                  <div style={styles.cardBody} className="p-3">
+                    <h6 style={styles.cardTitle}>Important Messages</h6>
+                    <div style={styles.importantSection}>
+                      {userData.adminMessage ? (
+                        <p style={styles.importantMessage}>
+                          {userData.adminMessage}
+                        </p>
+                      ) : (
+                        <p style={styles.importantMessage}>
+                          No important messages from admin.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

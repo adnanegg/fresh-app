@@ -351,6 +351,18 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       transition: "transform 0.2s, background 0.2s",
     },
+    importantSection: {
+      marginBottom: "20px",
+      border: "2px solid #dc3545",
+      borderRadius: "8px",
+      background: "rgba(255, 245, 245, 0.9)",
+    },
+    importantMessage: {
+      fontSize: "16px",
+      color: "#dc3545",
+      padding: "10px",
+      textAlign: "center",
+    },
   };
 
   const stylesString = `
@@ -485,7 +497,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
             title="Switch to Weekly Mode"
           >
             <i className="bi bi-arrow-repeat me-2"></i>
-            Weekly Mode
+            Switch to Weekly Mode
           </button>
           <button onClick={handleLogout} className="nav-logout">
             <i className="bi bi-box-arrow-right"></i> Logout
@@ -566,6 +578,27 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                           Share my data with admin
                         </span>
                       </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* Important Section */}
+              <div className="row mb-4">
+                <div className="col-12">
+                  <div style={styles.dashboardCard} className="card shadow-sm">
+                    <div style={styles.cardBody} className="p-3">
+                      <h6 style={styles.cardTitle}>Important Messages</h6>
+                      <div style={styles.importantSection}>
+                        {userData.adminMessage ? (
+                          <p style={styles.importantMessage}>
+                            {userData.adminMessage}
+                          </p>
+                        ) : (
+                          <p style={styles.importantMessage}>
+                            No important messages from admin.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -31,6 +31,7 @@ const AdminScorePage = () => {
   const [scoreData, setScoreData] = useState([]);
   const [performanceData, setPerformanceData] = useState([]);
   const [taskAverages, setTaskAverages] = useState([]);
+  const [nonReadyUsers, setNonReadyUsers] = useState([]); // Stores { userId, lastLogin }
   const isAdmin = auth.currentUser?.email === "admin@gmail.com";
 
   // Redirect non-admins
@@ -100,11 +101,27 @@ const AdminScorePage = () => {
         WakeUpEarlyP: { username: "N/A", percentage: 0 },
       };
       let userCount = 0;
+      const nonReadyUserData = []; // Collect non-ready user IDs and lastLogin
+      const today = new Date().toISOString().split("T")[0]; // Get today's date (YYYY-MM-DD)
 
       for (const userId in users) {
         const user = users[userId];
-        // Only process users where isReady is true
-        if (user.isReady !== true) continue;
+        // Collect users with isReady false
+        if (user.isReady !== true) {
+          const lastLogin = user.lastLogin || null; // Get lastLogin, if exists
+          let lastLoginDisplay = "No login today";
+          if (lastLogin) {
+            const loginDate = new Date(lastLogin).toISOString().split("T")[0];
+            if (loginDate === today) {
+              lastLoginDisplay = new Date(lastLogin).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+            }
+          }
+          nonReadyUserData.push({ userId, lastLogin: lastLoginDisplay });
+          continue;
+        }
         if (!user.profile || !user.points || !user.tasks) continue;
 
         // Calculate task percentages
@@ -176,6 +193,7 @@ const AdminScorePage = () => {
       setScoreData(scoreChartData);
       setPerformanceData(performanceTableData);
       setTaskAverages(taskAverageData);
+      setNonReadyUsers(nonReadyUserData); // Set non-ready users with login data
 
       Swal.fire({
         icon: "success",
@@ -196,6 +214,7 @@ const AdminScorePage = () => {
     setScoreData([]);
     setPerformanceData([]);
     setTaskAverages([]);
+    setNonReadyUsers([]); // Clear non-ready users
     Swal.fire({
       icon: "success",
       title: "Charts Cleared",
@@ -549,10 +568,6 @@ const AdminScorePage = () => {
                               width: `${progress}%`,
                               backgroundColor:
                                 avg >= goal ? "#2dd4bf" : "#f97316",
-                              ...styles.progressFill,
-                              width: `${progress}%`,
-                              backgroundColor:
-                                avg >= goal ? "#2dd4bf" : "#f97316",
                             }}
                             role="progressbar"
                             aria-valuenow={progress}
@@ -753,6 +768,63 @@ const AdminScorePage = () => {
                           </td>
                           <td className="py-2 sm:py-3 px-2 sm:px-4">
                             {task.average}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Non-Ready Users Section */}
+      {nonReadyUsers.length > 0 && (
+        <div className="row mt-4">
+          <div className="col-12">
+            <div
+              style={styles.card}
+              className="card hover:scale-105 transition-transform"
+            >
+              <div style={styles.cardBody}>
+                <h3 style={{ ...styles.title, fontSize: "1.25rem" }}>
+                  <i
+                    className="bi bi-exclamation-triangle-fill me-2"
+                    style={{ color: "#dc3545" }}
+                  ></i>
+                  Non-Ready Users (Pending Punishment)
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="table w-full table-bordered table-striped text-sm sm:text-base">
+                    <thead>
+                      <tr
+                        style={{
+                          background:
+                            "linear-gradient(to right, #dc3545, #6c757d)",
+                          color: "#ffffff",
+                        }}
+                      >
+                        <th className="py-2 sm:py-3 px-2 sm:px-4">User ID</th>
+                        <th className="py-2 sm:py-3 px-2 sm:px-4">
+                          Last Login Today
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {nonReadyUsers.map((user, index) => (
+                        <tr
+                          key={index}
+                          className={`${
+                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                          } hover:bg-red-100 transition-colors`}
+                        >
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {user.userId}
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            {user.lastLogin}
                           </td>
                         </tr>
                       ))}

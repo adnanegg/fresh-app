@@ -42,6 +42,7 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     syncWithFirebase,
     submitFeedback,
     viewFeedback,
+    handleReadyChange,
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "weekly");
 
   const [openAchievementSections, setOpenAchievementSections] = useState({});
@@ -551,10 +552,10 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
           }
-            .feedback-button:hover, .feedback-button:active {
-              transform: scale(1.05);
-              background: linear-gradient(135deg, #0056b3, #003d80);
-    }
+          .feedback-button:hover, .feedback-button:active {
+            transform: scale(1.05);
+            background: linear-gradient(135deg, #0056b3, #003d80);
+          }
         `}
       </style>
       {isSyncing && (
@@ -707,6 +708,24 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                           ).length
                         }
                       </span>
+                    </div>
+                    {/* Checkbox for isReady using handleReadyChange */}
+                    <div className="mt-1">
+                      <label className="d-flex align-items-center justify-content-center">
+                        <input
+                          type="checkbox"
+                          checked={userData.isReady}
+                          onChange={(e) => handleReadyChange(e.target.checked)}
+                          className="me-2"
+                          style={{ transform: "scale(0.8)" }}
+                        />
+                        <span
+                          className="text-muted"
+                          style={{ fontSize: "9px" }}
+                        >
+                          Share my data with admin
+                        </span>
+                      </label>
                     </div>
                   </div>
                 </div>

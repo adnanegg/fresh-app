@@ -52,6 +52,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     applyGlobalBoost,
     startWeekForAllUsers,
     claimBonus,
+    handleReadyChange,
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "daily");
 
   const [openAchievementSections, setOpenAchievementSections] = useState({});
@@ -444,7 +445,8 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       minHeight: 44px;
       transition: transform 0.2s, background 0.2s;
     }
-    .apply-global-boost-button:hover, .apply-global-boost-button:active {
+    .apply-global-boost-button:hover, .apply-global-boost-button:active
+    {
       transform: scale(1.05);
       background: linear-gradient(135deg, #a71d2a, #7a1a1f);
     }
@@ -486,7 +488,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       {isSyncing && (
         <div style={styles.syncOverlay}>Syncing, please wait...</div>
       )}
-      
+
       {notifications
         .filter((n) => n.global && !dismissedNotifications.includes(n.id))
         .map((notification) => (
@@ -629,6 +631,24 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                           ).length
                         }
                       </span>
+                    </div>
+                    {/* Checkbox for isReady using handleReadyChange */}
+                    <div className="mt-1">
+                      <label className="d-flex align-items-center justify-content-center">
+                        <input
+                          type="checkbox"
+                          checked={userData.isReady}
+                          onChange={(e) => handleReadyChange(e.target.checked)}
+                          className="me-2"
+                          style={{ transform: "scale(0.8)" }}
+                        />
+                        <span
+                          className="text-muted"
+                          style={{ fontSize: "9px" }}
+                        >
+                          Share my data with admin
+                        </span>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -1194,7 +1214,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                   </span>{" "}
                                   {task.name}{" "}
                                   <small className="text-muted">
-                                    ({task.dailyCounter}/{task.dailyLimit})
+                                    ({task.daylyCounter}/{task.dailyLimit})
                                   </small>
                                 </span>
                                 <button
