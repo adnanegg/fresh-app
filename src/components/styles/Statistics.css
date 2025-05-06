@@ -1,0 +1,44 @@
+/* Statistics.css */
+.statistics-content {
+  transition: width 0.3s ease;
+}
+
+.statistics-content.expanded {
+  width: calc(100% - 250px);
+}
+
+.statistics-content:not(.expanded) {
+  width: calc(100% - 60px);
+}
+
+.chart-container {
+  position: relative;
+  margin: auto;
+  width: 100%;
+}
+
+.report-section {
+  max-height: 300px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.form-select-sm {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: 120px; /* Match the inline style for consistency */
+}
+
+
+
+
+
+
+
+.dashboard-card {
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  background: transparent;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}

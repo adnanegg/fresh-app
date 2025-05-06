@@ -1,0 +1,130 @@
+/* src/styles/Login.css */
+
+.login-container {
+  position: relative;
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.video-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+  opacity: 0.8; /* Slightly reduce opacity for better readability of the card */
+}
+
+.login-card {
+  background: rgba(255, 255, 255, 0.95); /* Slightly transparent white for readability over the misty video */
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* Softer shadow to match the misty aesthetic */
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  z-index: 1;
+  border: 1px solid rgba(0, 123, 255, 0.1); /* Subtle blue border to tie into the video’s cool tones */
+}
+
+.login-card h2 {
+  margin-bottom: 20px;
+  font-size: 24px;
+  color: #333;
+  font-weight: 600;
+}
+
+.form-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #555;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.9); /* Slightly transparent input background */
+  transition: border-color 0.3s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+}
+
+.login-button {
+  width: 100%;
+  padding: 12px;
+  font-size: 18px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.login-button:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
+.signup-link {
+  margin-top: 15px;
+  color: #333;
+  font-size: 14px;
+}
+
+.signup-link a {
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.signup-link a:hover {
+  text-decoration: underline;
+  color: #0056b3;
+}
+
+@media (max-width: 768px) {
+  .login-card {
+    margin: 20px;
+    padding: 20px;
+    max-width: 90%;
+  }
+
+  .login-card h2 {
+    font-size: 20px;
+  }
+
+  .form-group input {
+    font-size: 14px;
+    padding: 8px;
+  }
+
+  .login-button {
+    font-size: 16px;
+    padding: 10px;
+  }
+
+  .signup-link {
+    font-size: 12px;
+  }
+}

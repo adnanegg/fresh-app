@@ -1,0 +1,248 @@
+/* Dashboard.css (Optimized)
+.container-fluid {
+  padding: 0;
+}
+
+.sidebar-container {
+  height: 100vh;
+  top: 0;
+  transition: width 0.3s ease;
+}
+
+.sidebar-container:not(.expanded) {
+  width: 60px;
+}
+
+.sidebar-container.expanded {
+  width: 250px;
+}
+
+.sidebar {
+  background-color: #fafaf8;
+  height: 100%;
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sidebar-header {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.whale-logo {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+}
+
+.expand-toggle {
+  font-size: 16px;
+  padding: 5px;
+}
+
+.sidebar-nav li {
+  list-style: none;
+  width: 100%;
+}
+
+.sidebar-nav li a,
+.sidebar-nav li button {
+  padding: 8px 16px;
+  text-decoration: none;
+  color: #666;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-icon {
+  font-size: 20px;
+  color: #666;
+  margin-right: 8px;
+  transition: color 0.3s ease;
+}
+
+.sidebar-icon:hover {
+  color: #007bff;
+}
+
+.sidebar-text {
+  font-size: 14px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-container.expanded .sidebar-text {
+  opacity: 1;
+}
+
+.sidebar-container:not(.expanded) .sidebar-text {
+  display: none;
+}
+
+.sidebar-section {
+  width: 100%;
+}
+
+.sidebar-section-title {
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  margin: 10px 0 5px 16px;
+  font-weight: 600;
+}
+
+.profile-avatar {
+  position: relative;
+  display: inline-block;
+}
+
+.sidebar-profile-icon {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #007bff;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #dc3545;
+  color: white;
+  border-radius: 50%;
+  width: 15px;
+  height: 15px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-content {
+  transition: width 0.3s ease;
+}
+
+.dashboard-content.expanded {
+  width: calc(100% - 250px);
+}
+
+.dashboard-content:not(.expanded) {
+  width: calc(100% - 60px);
+}
+
+.dashboard-card {
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.card-body {
+  padding: 12px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.progress {
+  background-color: #e9ecef;
+  border-radius: 4px;
+  height: 8px;
+}
+
+.progress-bar {
+  border-radius: 4px;
+}
+
+.list-group-item {
+  border: none;
+  padding: 8px 0;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.btn-xs { 
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.text-muted {
+  color: #6c757d !important;
+}
+
+.small {
+  font-size: 12px;
+}
+
+.form-select-sm {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.boost-badge {
+  color: #ffc107;
+  font-size: 14px;
+}
+
+.boost-badge:hover::after {
+  content: attr(title);
+  position: absolute;
+  background: #333;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 1000;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.boost-name { 
+  font-size: 12px;
+  color: #ffc107;
+  font-weight: bold;
+  margin-left: 5px;
+}
+
+.boosted-task {
+  border-left: 4px solid #ffc107;
+}
+
+.task-notification {
+  pointer-events: none;
+  position: absolute;
+  top: -20px;
+  right: 0;
+  font-size: 12px;
+  color: #28a745;
+  font-weight: bold;
+  animation: popUp 2s ease-out forwards;
+}
+
+@keyframes popUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-30px) scale(1);
+  }
+} */

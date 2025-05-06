@@ -1,0 +1,68 @@
+.tutorial-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.tutorial-highlight {
+  position: fixed; /* Fixed to viewport, not scrolling */
+  background: transparent; /* Transparent highlight area */
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+  z-index: 2001; /* Above overlay but below tutorial box */
+  pointer-events: none; /* Allow interaction with highlighted content */
+  transition: all 0.3s ease;
+}
+
+.tutorial-box {
+  position: fixed;
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  max-width: 300px;
+  pointer-events: auto;
+  z-index: 2002; /* Above highlight */
+}
+
+.tutorial-box.right {
+  right: 20px;
+}
+.tutorial-box.left {
+  left: 20px;
+}
+.tutorial-box.center {
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.tutorial-box h3 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+  color: #007bff;
+}
+
+.tutorial-box p {
+  font-size: 1rem;
+  color: #333;
+}
+
+.tutorial-next {
+  background: #007bff;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.tutorial-next:hover {
+  background: #0056b3;
+}
