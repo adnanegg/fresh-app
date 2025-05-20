@@ -7,8 +7,9 @@ import {
   EmailAuthProvider,
 } from "firebase/auth";
 import { useNavigate, Link } from "react-router-dom";
-import { ref, get, update, remove } from "firebase/database";
+import { ref, get, update, remove, set } from "firebase/database";
 import Swal from "sweetalert2";
+import NotificationService from "../services/notificationService";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -45,6 +46,7 @@ const Dashboard = () => {
   const [tempName, setTempName] = useState(userProfile.name);
   const [programLink, setProgramLink] = useState("/normal-mode");
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [oneSignalError, setOneSignalError] = useState(null);
 
   // Define performance goals for all tasks
   const taskGoals = {
@@ -57,158 +59,29 @@ const Dashboard = () => {
     "Wake Up": 70,
   };
 
-  // Check OneSignal subscription status
   useEffect(() => {
-    if (!window.OneSignal) {
-      console.error("OneSignal SDK not loaded");
-      Swal.fire({
-        icon: "error",
-        title: "Notification Error",
-        text: "Notification service is not available. Please try again later.",
-      });
-      return;
-    }
+    const setupNotifications = async () => {
+      if (!userId) return;
 
-    let isMounted = true;
-
-    const checkSubscription = async () => {
       try {
-        // Check if OneSignal is initialized
-        if (!window.OneSignal.initialized) {
-          console.log("Waiting for OneSignal initialization...");
-          return;
-        }
+        // Check subscription status in Firebase
+        const isSubscribed = await NotificationService.checkSubscriptionStatus(
+          userId
+        );
+        setIsSubscribed(isSubscribed);
 
-        // Check service worker readiness
-        if ("serviceWorker" in navigator) {
-          const registration = await navigator.serviceWorker.getRegistration(
-            "/OneSignalSDKWorker.js"
-          );
-          if (!registration) {
-            console.warn("OneSignal service worker not registered.");
-            if (isMounted) {
-              Swal.fire({
-                icon: "warning",
-                title: "Notification Setup Issue",
-                text: "Notifications may not work properly. Please refresh the page.",
-              });
-            }
-            return;
-          }
-        }
-
-        // Check notification permission
-        const permission = await window.OneSignal.Notifications.permission;
-        if (!isMounted) return;
-        setIsSubscribed(permission);
-        console.log("OneSignal subscription status:", permission);
-
-        // Set external_user_id if subscribed
-        if (userId && permission) {
-          await window.OneSignal.login(userId);
-          console.log("Set external_user_id successfully");
-        }
-
-        // Prompt if permission is 'default'
-        if (permission === false) {
-          try {
-            await window.OneSignal.Slidedown.promptPush();
-          } catch (promptError) {
-            console.error("Failed to show slidedown prompt:", promptError);
-            if (isMounted) {
-              Swal.fire({
-                icon: "error",
-                title: "Notification Prompt Failed",
-                text: "Could not display notification prompt. Please try again.",
-              });
-            }
-          }
+        if (!isSubscribed) {
+          // Initialize OneSignal and show prompt if not subscribed
+          await NotificationService.initializeOneSignal(userId);
         }
       } catch (error) {
-        console.error("Error checking OneSignal subscription:", error);
-        if (isMounted) {
-          Swal.fire({
-            icon: "error",
-            title: "Notification Error",
-            text: "Failed to check notification status.",
-          });
-        }
+        console.error("Notification setup failed:", error);
+        setOneSignalError("Failed to setup notifications");
       }
     };
 
-    checkSubscription();
-
-    return () => {
-      isMounted = false;
-    };
+    setupNotifications();
   }, [userId]);
-
-  // Handle manual subscription
-  const handleSubscribe = async () => {
-    if (!window.OneSignal) {
-      Swal.fire({
-        icon: "error",
-        title: "OneSignal Not Loaded",
-        text: "Notification service is not available. Please try again later.",
-      });
-      return;
-    }
-
-    try {
-      // Check if OneSignal is initialized
-      if (!window.OneSignal.initialized) {
-        console.log("Waiting for OneSignal initialization...");
-        return;
-      }
-
-      // Check service worker readiness
-      if ("serviceWorker" in navigator) {
-        const registration = await navigator.serviceWorker.getRegistration(
-          "/OneSignalSDKWorker.js"
-        );
-        if (!registration) {
-          Swal.fire({
-            icon: "error",
-            title: "Notification Setup Issue",
-            text: "Notifications are not set up correctly. Please refresh the page.",
-          });
-          return;
-        }
-      }
-
-      // Show the Slidedown prompt
-      await window.OneSignal.Slidedown.promptPush({
-        force: true,
-        text: {
-          actionMessage:
-            "We'd like to send you notifications for the latest updates.",
-          acceptButton: "Allow",
-          cancelButton: "Cancel",
-        },
-      });
-
-      const permission = await window.OneSignal.Notifications.permission;
-      setIsSubscribed(permission);
-      if (permission) {
-        Swal.fire({
-          icon: "success",
-          title: "Subscribed!",
-          text: "You are now subscribed to notifications.",
-        });
-        if (userId) {
-          await window.OneSignal.login(userId);
-          console.log("Set external_user_id after subscription");
-        }
-      }
-    } catch (error) {
-      console.error("Error prompting for push:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Subscription Failed",
-        text: "Could not prompt for notifications. Please try again.",
-      });
-    }
-  };
 
   useEffect(() => {
     setScoreFormData((prev) => ({
@@ -1113,6 +986,17 @@ const Dashboard = () => {
       marginTop: "8px",
       width: "100%",
     },
+    retryButton: {
+      padding: "8px 16px",
+      backgroundColor: "#ffc107",
+      color: "white",
+      border: "none",
+      borderRadius: "4px",
+      cursor: "pointer",
+      fontSize: "14px",
+      marginTop: "8px",
+      width: "100%",
+    },
   };
 
   const stylesString = `
@@ -1284,15 +1168,12 @@ const Dashboard = () => {
                     >
                       <i className="bi bi-trash-fill me-1"></i>Delete Account
                     </button>
-                    <button
-                      onClick={handleSubscribe}
-                      style={styles.subscribeButton}
-                      disabled={isSubscribed}
-                    >
-                      {isSubscribed
-                        ? "Subscribed to Notifications"
-                        : "Subscribe to Notifications"}
-                    </button>
+                    <p className="text-muted small mt-2">
+                      Notifications: {isSubscribed ? "Enabled" : "Disabled"}
+                    </p>
+                    {oneSignalError && (
+                      <p className="text-danger small mt-2">{oneSignalError}</p>
+                    )}
                   </>
                 )}
                 <p className="text-muted small">

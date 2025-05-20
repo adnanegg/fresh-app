@@ -69,6 +69,61 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
     return () => clearInterval(interval);
   }, [syncWithFirebase]);
 
+  const handleResetMonthlyPointsBar = async () => {
+    const result = await Swal.fire({
+      title: "Reset Monthly Points?",
+      text: "This will reset your monthly points to 0. This action cannot be undone. Continue?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetMonthlyPointsBar();
+    }
+  };
+  const handleStartTheWeek = async () => {
+    const result = await Swal.fire({
+      title: "Start New Week?",
+      text: "This will reset all task completions, points, and boosts, and archive the current week's data. Continue?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Start Week",
+      confirmButtonColor: "#28a745",
+    });
+    if (result.isConfirmed) {
+      startTheWeek();
+    }
+  };
+
+  const handleResetPointsBar = async () => {
+    const result = await Swal.fire({
+      title: "Reset Points?",
+      text: "This will reset your weekly points to 0. This action cannot be undone. Continue?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetPointsBar();
+    }
+  };
+
+  const handleResetTaskCompletionCount = async (index) => {
+    const task = userData.tasks[index];
+    const result = await Swal.fire({
+      title: "Reset Task?",
+      text: `This will reset the completion count for "${task.name}" to 0. Continue?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetTaskCompletionCount(index);
+    }
+  };
   const styles = {
     container: { padding: 0 },
     dashboardContent: {
@@ -594,7 +649,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                         </button>
                       </div>
                       <button
-                        onClick={resetPointsBar}
+                        onClick={handleResetPointsBar}
                         style={{ marginTop: "10px", width: "100%" }}
                         className="btn btn-warning"
                       >
@@ -651,7 +706,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                         </button>
                       </div>
                       <button
-                        onClick={resetMonthlyPointsBar}
+                        onClick={handleResetMonthlyPointsBar}
                         style={{ marginTop: "10px", width: "100%" }}
                         className="btn btn-warning"
                       >
@@ -743,7 +798,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                 }}
               >
                 <button
-                  onClick={startTheWeek}
+                  onClick={handleStartTheWeek}
                   style={styles.startWeekButton}
                   className="btn start-week-button"
                   title="Start this week's tasks"
@@ -936,7 +991,7 @@ const WeeklyMode = ({ globalTasks, refreshGlobalTasks }) => {
                                             </button>
                                             <button
                                               onClick={() =>
-                                                resetTaskCompletionCount(
+                                                handleResetTaskCompletionCount(
                                                   originalIndex
                                                 )
                                               }

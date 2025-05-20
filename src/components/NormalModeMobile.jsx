@@ -30,8 +30,6 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     completeTask,
     undoTask,
     resetTaskCompletionCount,
-    resetCompletedTasks,
-    resetAllTaskCompletionCount,
     resetPointsBar,
     resetMonthlyPointsBar,
     handleLogout,
@@ -58,44 +56,8 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
   const [openAchievementSections, setOpenAchievementSections] = useState({});
   const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = useState(false);
 
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [dontShowTutorial, setDontShowTutorial] = useState(false);
   const [adminSelectedTaskId, setAdminSelectedTaskId] = useState("");
   const [adminSelectedBoost, setAdminSelectedBoost] = useState("");
-  const [dismissedNotifications, setDismissedNotifications] = useState(() => {
-    return (
-      JSON.parse(
-        localStorage.getItem(`dismissedNotifications_${auth.currentUser?.uid}`)
-      ) || []
-    );
-  });
-
-  const contentHash = JSON.stringify(normalTutorialMessages);
-
-  // Handle tutorial visibility and content change
-  useEffect(() => {
-    const storedHash = localStorage.getItem("tutorialContentHash");
-    const storedDontShow = localStorage.getItem("dontShowTutorial") === "true";
-
-    if (storedHash !== contentHash) {
-      localStorage.setItem("tutorialContentHash", contentHash);
-      localStorage.removeItem("dontShowTutorial");
-      setShowTutorial(true);
-    } else if (!storedDontShow) {
-      setShowTutorial(true);
-    }
-    setDontShowTutorial(storedDontShow);
-  }, [contentHash]);
-
-  const dismissNotification = (notificationId) => {
-    setDismissedNotifications((prev) => [...prev, notificationId]);
-  };
-  // Handle checkbox toggle
-  const handleDontShowChange = (e) => {
-    const checked = e.target.checked;
-    setDontShowTutorial(checked);
-    localStorage.setItem("dontShowTutorial", checked);
-  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -116,6 +78,75 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
         switchMode("weekly");
       }
     });
+  };
+  const handleStartTheDay = async () => {
+    const result = await Swal.fire({
+      title: "Start New Day?",
+      text: "This will reset all daily task counters. Any uncompleted DoubleOrDie tasks will deduct 10 points each. Continue?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Start Day",
+      confirmButtonColor: "#007bff",
+    });
+    if (result.isConfirmed) {
+      startTheDay();
+    }
+  };
+
+  const handleStartTheWeek = async () => {
+    const result = await Swal.fire({
+      title: "Start New Week?",
+      text: "This will reset all task completions, points, and boosts, and archive the current week's data. Continue?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Start Week",
+      confirmButtonColor: "#28a745",
+    });
+    if (result.isConfirmed) {
+      startTheWeek();
+    }
+  };
+
+  const handleResetPointsBar = async () => {
+    const result = await Swal.fire({
+      title: "Reset Points?",
+      text: "This will reset your weekly points to 0. This action cannot be undone. Continue?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetPointsBar();
+    }
+  };
+
+  const handleResetTaskCompletionCount = async (index) => {
+    const task = userData.tasks[index];
+    const result = await Swal.fire({
+      title: "Reset Task?",
+      text: `This will reset the completion count for "${task.name}" to 0. Continue?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetTaskCompletionCount(index);
+    }
+  };
+  const handleResetMonthlyPointsBar = async () => {
+    const result = await Swal.fire({
+      title: "Reset Monthly Points?",
+      text: "This will reset your monthly points to 0. This action cannot be undone. Continue?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetMonthlyPointsBar();
+    }
   };
 
   const styles = {
@@ -489,37 +520,6 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
         <div style={styles.syncOverlay}>Syncing, please wait...</div>
       )}
 
-      {notifications
-        .filter((n) => n.global && !dismissedNotifications.includes(n.id))
-        .map((notification) => (
-          <React.Fragment key={notification.id}>
-            <div
-              style={styles.tutorialOverlay}
-              onClick={() => dismissNotification(notification.id)}
-            ></div>
-            <div
-              style={styles.notificationModal}
-              className="notification-modal"
-            >
-              <h3
-                style={{
-                  marginBottom: "12px",
-                  fontWeight: "bold",
-                  fontSize: "14px",
-                }}
-              >
-                Notification
-              </h3>
-              <div style={styles.tutorialContent}>{notification.message}</div>
-              <button
-                onClick={() => dismissNotification(notification.id)}
-                style={styles.notificationButton}
-              >
-                Close
-              </button>
-            </div>
-          </React.Fragment>
-        ))}
       <video autoPlay loop muted style={styles.videoBackground}>
         <source src="/videos/backvideo2.mp4" type="video/mp4" />
         Your browser does not support the video tag.
@@ -688,7 +688,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                         </button>
                       </div>
                       <button
-                        onClick={resetPointsBar}
+                        onClick={handleResetPointsBar}
                         className="btn btn-warning btn-sm w-100 mt-1"
                         style={{ fontSize: "9px", minHeight: "30px" }}
                       >
@@ -733,7 +733,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                         </button>
                       </div>
                       <button
-                        onClick={resetMonthlyPointsBar}
+                        onClick={handleResetMonthlyPointsBar}
                         className="btn btn-warning btn-sm w-100 mt-1"
                         style={{ fontSize: "9px", minHeight: "30px" }}
                       >
@@ -899,7 +899,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
             <div className="row mb-2">
               <div className="d-flex justify-content-between flex-wrap">
                 <button
-                  onClick={startTheDay}
+                  onClick={handleStartTheDay}
                   style={styles.startDayButton}
                   className="btn start-day-button"
                 >
@@ -907,7 +907,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                   Start Today
                 </button>
                 <button
-                  onClick={startTheWeek}
+                  onClick={handleStartTheWeek}
                   style={styles.startWeekButton}
                   className="btn start-week-button"
                 >
@@ -1074,7 +1074,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                             </button>
                                             <button
                                               onClick={() =>
-                                                resetTaskCompletionCount(
+                                                handleResetTaskCompletionCount(
                                                   originalIndex
                                                 )
                                               }

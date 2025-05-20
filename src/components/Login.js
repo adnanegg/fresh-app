@@ -7,7 +7,7 @@ import {
   setPersistence,
   browserLocalPersistence,
 } from "firebase/auth";
-import { ref, get, set } from "firebase/database"; // Add 'set' import
+import { ref, get, set } from "firebase/database";
 import { useNavigate, Link } from "react-router-dom";
 import "./styles/Login.css";
 import Swal from "sweetalert2";
@@ -19,11 +19,80 @@ const Login = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const cacheAndVerifyData = async () => {
+    try {
+      const globalTasksRef = ref(database, "globalTasks");
+      const achievementsRef = ref(database, "achievements");
+
+      const cachedTasks = localStorage.getItem("globalTasks");
+      const cachedAchievements = localStorage.getItem("achievements");
+
+      const [tasksSnapshot, achievementsSnapshot] = await Promise.all([
+        get(globalTasksRef),
+        get(achievementsRef),
+      ]);
+
+      const firebaseTasks = tasksSnapshot.val() || {};
+      const firebaseAchievements = achievementsSnapshot.val() || {};
+
+      if (!cachedAchievements) {
+        localStorage.setItem(
+          "achievements",
+          JSON.stringify(firebaseAchievements)
+        );
+      }
+
+      if (!cachedTasks) {
+        localStorage.setItem("globalTasks", JSON.stringify(firebaseTasks));
+      }
+
+      const currentCachedAchievements = JSON.parse(cachedAchievements || "{}");
+      if (
+        JSON.stringify(currentCachedAchievements) !==
+        JSON.stringify(firebaseAchievements)
+      ) {
+        localStorage.setItem(
+          "achievements",
+          JSON.stringify(firebaseAchievements)
+        );
+        console.log("Achievements updated from Firebase");
+      }
+
+      const currentCachedTasks = JSON.parse(cachedTasks || "{}");
+      if (
+        JSON.stringify(currentCachedTasks) !== JSON.stringify(firebaseTasks)
+      ) {
+        localStorage.setItem("globalTasks", JSON.stringify(firebaseTasks));
+        console.log("Global tasks updated from Firebase");
+      }
+    } catch (error) {
+      console.error("Error caching and verifying data:", error);
+    }
+  };
+
+  const updateLastLogin = async (userId) => {
+    try {
+      // Check if lastLogin was already updated in this session
+      const sessionKey = `lastLoginUpdated_${userId}`;
+      if (sessionStorage.getItem(sessionKey)) {
+        return;
+      }
+
+      const timestamp = new Date().toISOString();
+      await set(ref(database, `users/${userId}/lastLogin`), timestamp);
+      console.log(`Updated lastLogin for user ${userId}: ${timestamp}`);
+
+      // Mark lastLogin as updated for this session
+      sessionStorage.setItem(sessionKey, "true");
+    } catch (error) {
+      console.error("Error updating lastLogin:", error);
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      // Clear previous user data
       const oldUserId = localStorage.getItem("userId");
       if (oldUserId) {
         localStorage.removeItem(`userData_${oldUserId}`);
@@ -37,13 +106,11 @@ const Login = () => {
       );
       const userId = userCredential.user.uid;
 
-      // Update lastLogin timestamp
-      const timestamp = new Date().toISOString();
-      await set(ref(database, `users/${userId}/lastLogin`), timestamp);
+      // Update lastLogin
+      await updateLastLogin(userId);
 
-      await cacheAndVerifyData(userId);
+      await cacheAndVerifyData();
 
-      // Set localStorage flag and user ID
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("userId", userCredential.user.uid);
 
@@ -56,65 +123,6 @@ const Login = () => {
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const cacheAndVerifyData = async () => {
-    try {
-      // Get references to Firebase data
-      const globalTasksRef = ref(database, "globalTasks");
-      const achievementsRef = ref(database, "achievements");
-
-      // Get current cached data
-      const cachedTasks = localStorage.getItem("globalTasks");
-      const cachedAchievements = localStorage.getItem("achievements");
-
-      // Fetch fresh data from Firebase
-      const [tasksSnapshot, achievementsSnapshot] = await Promise.all([
-        get(globalTasksRef),
-        get(achievementsRef),
-      ]);
-
-      const firebaseTasks = tasksSnapshot.val() || {};
-      const firebaseAchievements = achievementsSnapshot.val() || {};
-
-      // Cache achievements if not present
-      if (!cachedAchievements) {
-        localStorage.setItem(
-          "achievements",
-          JSON.stringify(firebaseAchievements)
-        );
-      }
-
-      // Cache tasks if not present
-      if (!cachedTasks) {
-        localStorage.setItem("globalTasks", JSON.stringify(firebaseTasks));
-      }
-
-      // Verify and update cached achievements if they don't match Firebase
-      const currentCachedAchievements = JSON.parse(cachedAchievements || "{}");
-      if (
-        JSON.stringify(currentCachedAchievements) !==
-        JSON.stringify(firebaseAchievements)
-      ) {
-        localStorage.setItem(
-          "achievements",
-          JSON.stringify(firebaseAchievements)
-        );
-        console.log("Achievements updated from Firebase");
-      }
-
-      // Verify and update cached global tasks if they don't match Firebase
-      const currentCachedTasks = JSON.parse(cachedTasks || "{}");
-      if (
-        JSON.stringify(currentCachedTasks) !== JSON.stringify(firebaseTasks)
-      ) {
-        localStorage.setItem("globalTasks", JSON.stringify(firebaseTasks));
-        console.log("Global tasks updated from Firebase");
-      }
-    } catch (error) {
-      console.error("Error caching and verifying data:", error);
-      // Fail silently - this shouldn't block login
     }
   };
 
@@ -178,10 +186,13 @@ const Login = () => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
       if (user && isLoggedIn) {
+        // Update lastLogin for automatic login
+        await updateLastLogin(user.uid);
+        await cacheAndVerifyData();
         navigate("/dashboard");
       }
     });

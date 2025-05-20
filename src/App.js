@@ -40,9 +40,9 @@ function App() {
   // Initialize OneSignal with service worker check
   useEffect(() => {
     const initOneSignal = async () => {
-      // Check if OneSignal is already initialized
-      if (window.OneSignal?.initialized) {
-        console.log("OneSignal already initialized, skipping.");
+      // Check if OneSignal is already initialized or initializing
+      if (window.OneSignal?.initialized || window.OneSignal?.isInitializing) {
+        console.log("OneSignal already initialized or initializing, skipping.");
         return;
       }
 
@@ -53,16 +53,18 @@ function App() {
       }
 
       try {
+        // Set initializing flag
+        window.OneSignal.isInitializing = true;
+
         // Wait for service worker to be ready
-        const registration = await navigator.serviceWorker.getRegistration(
-          "/OneSignalSDKWorker.js"
-        );
+        const registration = await navigator.serviceWorker.getRegistration();
         if (!registration) {
           console.warn(
             "OneSignal service worker not registered. Attempting registration..."
           );
           await navigator.serviceWorker.register("/OneSignalSDKWorker.js", {
             scope: "/",
+            updateViaCache: "none",
           });
         }
 
@@ -72,57 +74,106 @@ function App() {
           return;
         }
 
-        window.OneSignal.push(function () {
-          window.OneSignal.init({
-            appId: "fb06cd63-59c3-44cd-951a-14a982e1727d",
-            notifyButton: {
-              enable: true,
-            },
-            allowLocalhostAsSecureOrigin: true,
-            promptOptions: {
-              slidedown: {
-                prompts: [
-                  {
-                    type: "push",
-                    autoPrompt: true,
-                    text: {
-                      actionMessage:
-                        "We'd like to send you notifications for the latest updates.",
-                      acceptButton: "Allow",
-                      cancelButton: "Cancel",
-                    },
-                    delay: {
-                      pageViews: 1,
-                      timeDelay: 20,
-                    },
-                  },
-                ],
-              },
-            },
-          });
-        });
+        // Only initialize if not already initialized
+        if (!window.OneSignal.initialized) {
+          await new Promise((resolve, reject) => {
+            // Set a timeout to prevent infinite waiting
+            const timeout = setTimeout(() => {
+              reject(new Error("OneSignal initialization timeout"));
+            }, 10000); // 10 second timeout
 
-        // Set initialized flag after a short delay to ensure initialization is complete
-        setTimeout(() => {
-          window.OneSignal.initialized = true;
-          console.log("OneSignal initialized successfully");
-        }, 1000);
+            window.OneSignal.push(function () {
+              window.OneSignal.init({
+                appId: "fb06cd63-59c3-44cd-951a-14a982e1727d",
+                notifyButton: {
+                  enable: true,
+                },
+                // Configure for both development and production
+                allowLocalhostAsSecureOrigin:
+                  window.location.hostname === "localhost",
+                serviceWorkerPath: "/OneSignalSDKWorker.js",
+                serviceWorkerParam: { scope: "/" },
+                // Configure prompt options
+                promptOptions: {
+                  slidedown: {
+                    prompts: [
+                      {
+                        type: "push",
+                        autoPrompt: true,
+                        text: {
+                          actionMessage:
+                            "We'd like to send you notifications for the latest updates.",
+                          acceptButton: "Allow",
+                          cancelButton: "Cancel",
+                        },
+                        delay: {
+                          pageViews: 1,
+                          timeDelay: 20,
+                        },
+                      },
+                    ],
+                  },
+                },
+                // Configure for HTTPS
+                httpPermissionRequest: {
+                  enable: true,
+                  useCustomModal: true,
+                },
+                subdomainName: "dinwadunya",
+                origin: "https://dinwadunya-e6d3b.web.app",
+                safari_web_id:
+                  "web.onesignal.auto.5c2c2c2c-2c2c-2c2c-2c2c-2c2c2c2c2c2c",
+                config: {
+                  allowedDomains: ["dinwadunya-e6d3b.web.app", "localhost"], // Explicitly allow both domains
+                  restrictedOrigins: [],
+                },
+                // Service worker configuration
+                serviceWorkerRegistration: {
+                  scope: "/",
+                  path: "/OneSignalSDKWorker.js",
+                },
+              })
+                .then(() => {
+                  clearTimeout(timeout);
+                  window.OneSignal.initialized = true;
+                  window.OneSignal.isInitializing = false;
+                  console.log("OneSignal initialized successfully");
+                  resolve();
+                })
+                .catch((error) => {
+                  clearTimeout(timeout);
+                  window.OneSignal.isInitializing = false;
+                  reject(error);
+                });
+            });
+          });
+        }
       } catch (error) {
         console.error("OneSignal initialization failed:", error);
+        window.OneSignal.isInitializing = false;
+        // If initialization fails, we should still allow the app to function
+        window.OneSignal.initialized = true;
       }
     };
 
-    // Only initialize if OneSignal is available
-    if (window.OneSignal) {
+    // Only initialize if OneSignal is available and not already initialized
+    if (
+      window.OneSignal &&
+      !window.OneSignal.initialized &&
+      !window.OneSignal.isInitializing
+    ) {
       initOneSignal();
     } else {
-      console.error("OneSignal SDK not loaded in index.html");
+      console.log(
+        "OneSignal initialization skipped - already initialized or not available"
+      );
     }
 
     // Cleanup function
     return () => {
       if (window.OneSignal?.initialized) {
         window.OneSignal.initialized = false;
+        window.OneSignal.isInitializing = false;
       }
     };
   }, []);

@@ -79,6 +79,75 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     return () => clearInterval(interval);
   }, [syncWithFirebase]);
 
+  const handleResetMonthlyPointsBar = async () => {
+    const result = await Swal.fire({
+      title: "Reset Monthly Points?",
+      text: "This will reset your monthly points to 0. This action cannot be undone. Continue?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetMonthlyPointsBar();
+    }
+  };
+  const handleStartTheDay = async () => {
+    const result = await Swal.fire({
+      title: "Start New Day?",
+      text: "This will reset all daily task counters. Any uncompleted DoubleOrDie tasks will deduct 10 points each. Continue?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Start Day",
+      confirmButtonColor: "#007bff",
+    });
+    if (result.isConfirmed) {
+      startTheDay();
+    }
+  };
+
+  const handleStartTheWeek = async () => {
+    const result = await Swal.fire({
+      title: "Start New Week?",
+      text: "This will reset all task completions, points, and boosts, and archive the current week's data. Continue?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Start Week",
+      confirmButtonColor: "#28a745",
+    });
+    if (result.isConfirmed) {
+      startTheWeek();
+    }
+  };
+
+  const handleResetPointsBar = async () => {
+    const result = await Swal.fire({
+      title: "Reset Points?",
+      text: "This will reset your weekly points to 0. This action cannot be undone. Continue?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetPointsBar();
+    }
+  };
+
+  const handleResetTaskCompletionCount = async (index) => {
+    const task = userData.tasks[index];
+    const result = await Swal.fire({
+      title: "Reset Task?",
+      text: `This will reset the completion count for "${task.name}" to 0. Continue?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetTaskCompletionCount(index);
+    }
+  };
   const handleSaveProgress = async () => {
     try {
       await syncWithFirebase(true);
@@ -636,7 +705,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                         </button>
                       </div>
                       <button
-                        onClick={resetPointsBar}
+                        onClick={handleResetPointsBar}
                         className="btn btn-warning w-100 mt-2"
                       >
                         Reset Points
@@ -679,7 +748,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                         </button>
                       </div>
                       <button
-                        onClick={resetMonthlyPointsBar}
+                        onClick={handleResetMonthlyPointsBar}
                         className="btn btn-warning w-100 mt-2"
                       >
                         Reset Monthly Points
@@ -847,7 +916,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
             <div className="row mb-4" id="start-buttons">
               <div className="d-flex justify-content-between">
                 <button
-                  onClick={startTheDay}
+                  onClick={handleStartTheDay}
                   style={styles.startDayButton}
                   className="btn start-day-button"
                   title="Start today's tasks"
@@ -869,7 +938,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                   {isSyncing ? "Saving..." : "Save Your Progress"}
                 </button>
                 <button
-                  onClick={startTheWeek}
+                  onClick={handleStartTheWeek}
                   style={styles.startWeekButton}
                   className="btn start-week-button"
                   title="Start this week's tasks"
@@ -1039,7 +1108,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                                             </button>
                                             <button
                                               onClick={() =>
-                                                resetTaskCompletionCount(
+                                                handleResetTaskCompletionCount(
                                                   originalIndex
                                                 )
                                               }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { auth, database } from "../firebase";
-import { ref, onValue, update, remove, push } from "firebase/database";
+import { ref, onValue, update, remove, push, get } from "firebase/database";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
@@ -18,16 +18,18 @@ const AdminDashboard = () => {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [filterMode, setFilterMode] = useState("");
+  const [readyFilter, setReadyFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState(null);
+  const [sortDirection, setSortDirection] = useState("asc");
   const isAdmin = auth.currentUser?.email === "admin@gmail.com";
 
-  // Redirect non-admins
   useEffect(() => {
     if (!isAdmin) {
       navigate("/dashboard");
     }
   }, [isAdmin, navigate]);
 
-  // Fetch users, global tasks, and feedback
   useEffect(() => {
     const usersRef = ref(database, "users");
     const globalTasksRef = ref(database, "globalTasks");
@@ -48,6 +50,9 @@ const AdminDashboard = () => {
             mpointsTotal: users[userId].Mpoints?.total || 2800,
             mode: users[userId].preferences?.mode || "weekly",
             adminMessage: users[userId].adminMessage || "",
+            notificationSubscribed:
+              users[userId].notificationSubscribed || false,
+            isReady: users[userId].isReady || false,
           }));
           setUsersData(formattedData);
         } else {
@@ -88,17 +93,22 @@ const AdminDashboard = () => {
       (snapshot) => {
         if (snapshot.exists()) {
           const feedback = snapshot.val();
-          const formattedFeedback = Object.entries(feedback)
-            .map(([userId, userFeedback]) =>
-              Object.entries(userFeedback).map(([feedbackId, fb]) => ({
-                userId,
-                feedbackId,
-                message: fb.message,
-                timestamp: fb.timestamp,
-              }))
-            )
-            .flat();
-          setFeedbackData(formattedFeedback);
+          if (usersData.length > 0) {
+            const formattedFeedback = Object.entries(feedback)
+              .map(([userId, userFeedback]) => {
+                const user = usersData.find((u) => u.userId === userId);
+                return Object.entries(userFeedback).map(([feedbackId, fb]) => ({
+                  userId,
+                  feedbackId,
+                  message: fb.message || "",
+                  timestamp: fb.timestamp || Date.now(),
+                  userName: user?.profileName || "Unknown User",
+                }));
+              })
+              .flat()
+              .sort((a, b) => b.timestamp - a.timestamp);
+            setFeedbackData(formattedFeedback);
+          }
         } else {
           setFeedbackData([]);
         }
@@ -118,9 +128,8 @@ const AdminDashboard = () => {
       unsubscribeGlobalTasks();
       unsubscribeFeedback();
     };
-  }, []);
+  }, [usersData]);
 
-  // Log admin actions
   const logAdminAction = useCallback(async (action, details) => {
     try {
       const adminActionsRef = ref(database, "adminActions");
@@ -135,7 +144,6 @@ const AdminDashboard = () => {
     }
   }, []);
 
-  // Send notification to selected users via OneSignal
   const handleSendNotification = async () => {
     if (selectedUsers.length === 0) {
       Swal.fire({
@@ -172,14 +180,14 @@ const AdminDashboard = () => {
             headers: {
               "Content-Type": "application/json",
               Authorization:
-                "Basic os_v2_app_7mdm2y2zyncm3fi2csuyfylspvvcgay3zsfujxfvbyybgmgomzxhu7ksnowrs4scxqkc46pomopg5fm3fykb2uvxjaznkj355lupzbq", // Replace with your OneSignal API Key
+                "Basic os_v2_app_7mdm2y2zyncm3fi2csuyfylspvvcgay3zsfujxfvbyybgmgomzxhu7ksnowrs4scxqkc46pomopg5fm3fykb2uvxjaznkj355lupzbq",
             },
             body: JSON.stringify({
-              app_id: "fb06cd63-59c3-44cd-951a-14a982e1727d", // Replace with your OneSignal App ID
-              include_external_user_ids: selectedUsers, // Firebase userIds
+              app_id: "fb06cd63-59c3-44cd-951a-14a982e1727d",
+              include_external_user_ids: selectedUsers,
               headings: { en: value.title },
               contents: { en: value.body },
-              web_url: "http://localhost:3000/dashboard", // Update to production URL after deployment
+              web_url: "https://dinwadunya-e6d3b.web.app",
             }),
           }
         );
@@ -191,7 +199,6 @@ const AdminDashboard = () => {
         const result = await response.json();
         console.log("OneSignal response:", result);
 
-        // Log admin action
         await logAdminAction("send_notification", {
           userIds: selectedUsers,
           title: value.title,
@@ -221,29 +228,54 @@ const AdminDashboard = () => {
     }
   };
 
-  // Sorting
   const handleSort = (key) => {
     let direction = "asc";
     if (sortConfig.key === key && sortConfig.direction === "asc") {
       direction = "desc";
     }
     setSortConfig({ key, direction });
-
-    setUsersData((prev) =>
-      [...prev].sort((a, b) => {
-        if (a[key] < b[key]) return direction === "asc" ? -1 : 1;
-        if (a[key] > b[key]) return direction === "asc" ? 1 : -1;
-        return 0;
-      })
-    );
+    setSortField(key);
+    setSortDirection(direction);
   };
 
-  // Filtering
-  const filteredUsers = filterMode
-    ? usersData.filter((user) => user.mode === filterMode)
-    : usersData;
+  const filteredUsers = usersData
+    .filter((user) => {
+      const matchesSearch =
+        searchTerm === "" ||
+        user.profileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.lastLogin.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.mode.toLowerCase().includes(searchTerm.toLowerCase());
 
-  // User editing
+      const matchesReadyFilter =
+        readyFilter === "all" ||
+        (readyFilter === "ready" && user.isReady) ||
+        (readyFilter === "notReady" && !user.isReady);
+
+      const matchesModeFilter = filterMode === "" || user.mode === filterMode;
+
+      return matchesSearch && matchesReadyFilter && matchesModeFilter;
+    })
+    .sort((a, b) => {
+      if (!sortField) return 0;
+
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+
+      if (sortField === "isReady" || sortField === "notificationSubscribed") {
+        return sortDirection === "asc"
+          ? (aValue ? 1 : -1) - (bValue ? 1 : -1)
+          : (bValue ? 1 : -1) - (aValue ? 1 : -1);
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        return sortDirection === "asc"
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+
+      return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+    });
+
   const handleEditUser = (user) => {
     setEditingUserId(user.userId);
     setEditedUserData({
@@ -317,7 +349,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // User deletion
   const handleDeleteUser = async (userId, profileName) => {
     const result = await Swal.fire({
       title: `Delete ${profileName}?`,
@@ -358,7 +389,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Bulk edits
   const handleBulkEdit = async (action) => {
     if (selectedUsers.length === 0) {
       Swal.fire({
@@ -438,7 +468,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Global tasks editing
   const handleEditTask = (taskId) => {
     setEditingTaskId(taskId);
     setEditedTaskData({
@@ -522,7 +551,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Admin messages
   const handleEditMessage = (user) => {
     setEditingMessageUserId(user.userId);
     setEditedMessageData({ message: user.adminMessage || "" });
@@ -601,6 +629,209 @@ const AdminDashboard = () => {
       setEditedTaskData((prev) => ({ ...prev, [field]: value }));
     } else {
       setEditedMessageData((prev) => ({ ...prev, [field]: value }));
+    }
+  };
+
+  const handleToggleNotification = async (userId, newStatus) => {
+    try {
+      if (newStatus) {
+        // First check browser notification permission
+        const permission = Notification.permission;
+
+        if (permission === "default") {
+          // Request permission first
+          const result = await Swal.fire({
+            title: "Enable Notifications",
+            text: "Please allow notifications in your browser to receive updates",
+            icon: "info",
+            showCancelButton: true,
+            confirmButtonText: "Enable",
+            cancelButtonText: "Not Now",
+          });
+
+          if (result.isConfirmed) {
+            // Request browser permission
+            const permissionResult = await Notification.requestPermission();
+
+            if (permissionResult !== "granted") {
+              Swal.fire({
+                title: "Permission Denied",
+                text: "Browser notification permission is required to enable notifications",
+                icon: "warning",
+              });
+              return;
+            }
+          } else {
+            return;
+          }
+        } else if (permission === "denied") {
+          Swal.fire({
+            title: "Permission Denied",
+            text: "Browser notification permission is required. Please enable it in your browser settings.",
+            icon: "warning",
+          });
+          return;
+        }
+
+        // Now that we have permission, try to subscribe to OneSignal
+        try {
+          // First check if the user is already subscribed
+          const checkResponse = await fetch(
+            `https://onesignal.com/api/v1/players?app_id=fb06cd63-59c3-44cd-951a-14a982e1727d&external_user_id=${userId}`,
+            {
+              headers: {
+                Authorization:
+                  "Basic os_v2_app_7mdm2y2zyncm3fi2csuyfylspvvcgay3zsfujxfvbyybgmgomzxhu7ksnowrs4scxqkc46pomopg5fm3fykb2uvxjaznkj355lupzbq",
+              },
+            }
+          );
+
+          const checkData = await checkResponse.json();
+          const existingPlayer = checkData.players?.[0];
+
+          let response;
+          if (existingPlayer) {
+            // Update existing player
+            response = await fetch(
+              `https://onesignal.com/api/v1/players/${existingPlayer.id}`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization:
+                    "Basic os_v2_app_7mdm2y2zyncm3fi2csuyfylspvvcgay3zsfujxfvbyybgmgomzxhu7ksnowrs4scxqkc46pomopg5fm3fykb2uvxjaznkj355lupzbq",
+                },
+                body: JSON.stringify({
+                  app_id: "fb06cd63-59c3-44cd-951a-14a982e1727d",
+                  subscription_enabled: true,
+                }),
+              }
+            );
+          } else {
+            // Create new player
+            response = await fetch("https://onesignal.com/api/v1/players", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization:
+                  "Basic os_v2_app_7mdm2y2zyncm3fi2csuyfylspvvcgay3zsfujxfvbyybgmgomzxhu7ksnowrs4scxqkc46pomopg5fm3fykb2uvxjaznkj355lupzbq",
+              },
+              body: JSON.stringify({
+                app_id: "fb06cd63-59c3-44cd-951a-14a982e1727d",
+                external_user_id: userId,
+                identifier: userId,
+                device_type: 5,
+                subscription_enabled: true,
+                tags: {
+                  user_id: userId,
+                },
+              }),
+            });
+          }
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(
+              `OneSignal API error: ${
+                errorData.errors?.join(", ") || response.status
+              }`
+            );
+          }
+
+          // Update the visual flag only after successful OneSignal subscription
+          const updates = {
+            [`users/${userId}/notificationSubscribed`]: true,
+          };
+          await update(ref(database), updates);
+
+          Swal.fire({
+            title: "Success",
+            text: "User subscribed to notifications",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+          });
+        } catch (error) {
+          console.error("OneSignal subscription failed:", error);
+          Swal.fire({
+            title: "Error",
+            text: error.message || "Failed to subscribe to notifications",
+            icon: "error",
+          });
+        }
+      } else {
+        // Unsubscribe from OneSignal
+        try {
+          // First check if the user is subscribed
+          const checkResponse = await fetch(
+            `https://onesignal.com/api/v1/players?app_id=fb06cd63-59c3-44cd-951a-14a982e1727d&external_user_id=${userId}`,
+            {
+              headers: {
+                Authorization:
+                  "Basic os_v2_app_7mdm2y2zyncm3fi2csuyfylspvvcgay3zsfujxfvbyybgmgomzxhu7ksnowrs4scxqkc46pomopg5fm3fykb2uvxjaznkj355lupzbq",
+              },
+            }
+          );
+
+          const checkData = await checkResponse.json();
+          const existingPlayer = checkData.players?.[0];
+
+          if (existingPlayer) {
+            const response = await fetch(
+              `https://onesignal.com/api/v1/players/${existingPlayer.id}`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization:
+                    "Basic os_v2_app_7mdm2y2zyncm3fi2csuyfylspvvcgay3zsfujxfvbyybgmgomzxhu7ksnowrs4scxqkc46pomopg5fm3fykb2uvxjaznkj355lupzbq",
+                },
+                body: JSON.stringify({
+                  app_id: "fb06cd63-59c3-44cd-951a-14a982e1727d",
+                  subscription_enabled: false,
+                }),
+              }
+            );
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(
+                `OneSignal API error: ${
+                  errorData.errors?.join(", ") || response.status
+                }`
+              );
+            }
+          }
+
+          // Update the visual flag
+          const updates = {
+            [`users/${userId}/notificationSubscribed`]: false,
+          };
+          await update(ref(database), updates);
+
+          Swal.fire({
+            title: "Success",
+            text: "User unsubscribed from notifications",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+          });
+        } catch (error) {
+          console.error("OneSignal unsubscription failed:", error);
+          Swal.fire({
+            title: "Error",
+            text: error.message || "Failed to unsubscribe from notifications",
+            icon: "error",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to update notification status:", error);
+      Swal.fire({
+        title: "Error",
+        text: error.message || "Failed to update notification status",
+        icon: "error",
+      });
     }
   };
 
@@ -734,20 +965,50 @@ const AdminDashboard = () => {
         Admin Dashboard
       </h2>
 
-      {/* Users Section */}
       <div style={styles.card}>
         <h3 style={{ ...styles.title, fontSize: "1.2rem" }}>Users</h3>
-        <div style={{ marginBottom: "10px" }}>
-          <label>Filter by Mode: </label>
-          <select
-            style={styles.filterSelect}
-            value={filterMode}
-            onChange={(e) => setFilterMode(e.target.value)}
-          >
-            <option value="">All</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-          </select>
+        <div
+          style={{
+            marginBottom: "10px",
+            display: "flex",
+            gap: "10px",
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <label>Filter by Mode: </label>
+            <select
+              style={styles.filterSelect}
+              value={filterMode}
+              onChange={(e) => setFilterMode(e.target.value)}
+            >
+              <option value="">All</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </div>
+          <div>
+            <label>Filter by Status: </label>
+            <select
+              style={styles.filterSelect}
+              value={readyFilter}
+              onChange={(e) => setReadyFilter(e.target.value)}
+            >
+              <option value="all">All Users</option>
+              <option value="ready">Ready Users</option>
+              <option value="notReady">Not Ready Users</option>
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label>Search: </label>
+            <input
+              type="text"
+              style={styles.input}
+              placeholder="Search by name, email, or mode..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
         <div>
           <button
@@ -811,6 +1072,19 @@ const AdminDashboard = () => {
                 <th style={styles.th} onClick={() => handleSort("mode")}>
                   Mode{" "}
                   {sortConfig.key === "mode" &&
+                    (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </th>
+                <th
+                  style={styles.th}
+                  onClick={() => handleSort("notificationSubscribed")}
+                >
+                  Notification Subscribed{" "}
+                  {sortConfig.key === "notificationSubscribed" &&
+                    (sortConfig.direction === "asc" ? "↑" : "↓")}
+                </th>
+                <th style={styles.th} onClick={() => handleSort("isReady")}>
+                  Data Shared{" "}
+                  {sortConfig.key === "isReady" &&
                     (sortConfig.direction === "asc" ? "↑" : "↓")}
                 </th>
                 <th style={styles.th}>Actions</th>
@@ -899,6 +1173,31 @@ const AdminDashboard = () => {
                     )}
                   </td>
                   <td style={styles.td}>
+                    {user.notificationSubscribed ? (
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        Subscribed
+                      </span>
+                    ) : (
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                        Not Subscribed
+                      </span>
+                    )}
+                    <button
+                      onClick={() =>
+                        handleToggleNotification(
+                          user.userId,
+                          !user.notificationSubscribed
+                        )
+                      }
+                      className="ml-2 text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      {user.notificationSubscribed
+                        ? "Unsubscribe"
+                        : "Subscribe"}
+                    </button>
+                  </td>
+                  <td style={styles.td}>{user.isReady ? "Yes" : "No"}</td>
+                  <td style={styles.td}>
                     {editingUserId === user.userId ? (
                       <>
                         <button
@@ -942,7 +1241,6 @@ const AdminDashboard = () => {
         )}
       </div>
 
-      {/* Global Tasks Section */}
       <div style={styles.card}>
         <h3 style={{ ...styles.title, fontSize: "1.2rem" }}>Global Tasks</h3>
         {Object.keys(globalTasks).length > 0 ? (
@@ -1206,7 +1504,6 @@ const AdminDashboard = () => {
         )}
       </div>
 
-      {/* Admin Messages Section */}
       <div style={styles.card}>
         <h3 style={{ ...styles.title, fontSize: "1.2rem" }}>Admin Messages</h3>
         <button style={styles.bulkButton} onClick={handleAddMessageToAllUsers}>
@@ -1282,33 +1579,60 @@ const AdminDashboard = () => {
         )}
       </div>
 
-      {/* Feedback Section */}
       <div style={styles.card}>
         <h3 style={{ ...styles.title, fontSize: "1.2rem" }}>User Feedback</h3>
-        {feedbackData.length > 0 ? (
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>User ID</th>
-                <th style={styles.th}>Feedback</th>
-                <th style={styles.th}>Timestamp</th>
-              </tr>
-            </thead>
-            <tbody>
-              {feedbackData.map((feedback, index) => (
-                <tr key={index} className="hover:bg-teal-100 transition-colors">
-                  <td style={styles.td}>{feedback.userId.slice(0, 8)}...</td>
-                  <td style={styles.td}>{feedback.message}</td>
-                  <td style={styles.td}>
-                    {new Date(feedback.timestamp).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p>No feedback found.</p>
-        )}
+        <button
+          style={styles.bulkButton}
+          onClick={async () => {
+            try {
+              Swal.fire({
+                title: "Fetching Feedback...",
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading(),
+              });
+
+              const feedbackRef = ref(database, "feedback");
+              const feedbackSnapshot = await get(feedbackRef);
+              const feedbackData = feedbackSnapshot.val() || {};
+
+              if (Object.keys(feedbackData).length === 0) {
+                Swal.fire({
+                  icon: "info",
+                  title: "No Feedback",
+                  text: "No feedback has been submitted yet.",
+                  confirmButtonText: "OK",
+                });
+                return;
+              }
+
+              const feedbackList = Object.entries(feedbackData)
+                .map(([id, feedback]) => {
+                  const date = new Date(
+                    feedback.timestamp
+                  ).toLocaleDateString();
+                  return `<strong>From:</strong> ${feedback.email}<br><strong>Date:</strong> ${date}<br><strong>Message:</strong> ${feedback.message}<br><hr>`;
+                })
+                .join("");
+
+              Swal.fire({
+                icon: "info",
+                title: "User Feedback",
+                html: `<div style="text-align: left; max-height: 400px; overflow-y: auto;">${feedbackList}</div>`,
+                confirmButtonText: "Close",
+                width: "600px",
+              });
+            } catch (error) {
+              console.error("View feedback error:", error);
+              Swal.fire({
+                icon: "error",
+                title: "Failed to Load",
+                text: `Failed to load feedback: ${error.message}`,
+              });
+            }
+          }}
+        >
+          View Feedback
+        </button>
       </div>
     </div>
   );

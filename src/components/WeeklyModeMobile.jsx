@@ -46,48 +46,6 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
   } = useNormalModeLogic(globalTasks, refreshGlobalTasks, "weekly");
 
   const [openAchievementSections, setOpenAchievementSections] = useState({});
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [dontShowTutorial, setDontShowTutorial] = useState(false);
-  const [dismissedNotifications, setDismissedNotifications] = useState(() => {
-    return (
-      JSON.parse(
-        localStorage.getItem(`dismissedNotifications_${auth.currentUser?.uid}`)
-      ) || []
-    );
-  });
-
-  // Tutorial content
-  const tutorialMessages = [
-    'Click the "Start This Week" button to begin your weekly tasks.',
-    "Remember to apply this week's boost for extra benefits.",
-    "Save your progress before you leave to keep your changes safe.",
-  ];
-  const contentHash = JSON.stringify(tutorialMessages);
-
-  // Handle tutorial visibility and content change
-  useEffect(() => {
-    const storedHash = localStorage.getItem("tutorialContentHash");
-    const storedDontShow = localStorage.getItem("dontShowTutorial") === "true";
-
-    if (storedHash !== contentHash) {
-      localStorage.setItem("tutorialContentHash", contentHash);
-      localStorage.removeItem("dontShowTutorial");
-      setShowTutorial(true);
-    } else if (!storedDontShow) {
-      setShowTutorial(true);
-    }
-    setDontShowTutorial(storedDontShow);
-  }, [contentHash]);
-
-  const dismissNotification = (notificationId) => {
-    setDismissedNotifications((prev) => [...prev, notificationId]);
-  };
-  // Handle checkbox toggle
-  const handleDontShowChange = (e) => {
-    const checked = e.target.checked;
-    setDontShowTutorial(checked);
-    localStorage.setItem("dontShowTutorial", checked);
-  };
 
   // Sync every 10 seconds
   useEffect(() => {
@@ -97,6 +55,61 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
     return () => clearInterval(interval);
   }, [syncWithFirebase]);
 
+  const handleStartTheWeek = async () => {
+    const result = await Swal.fire({
+      title: "Start New Week?",
+      text: "This will reset all task completions, points, and boosts, and archive the current week's data. Continue?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Start Week",
+      confirmButtonColor: "#28a745",
+    });
+    if (result.isConfirmed) {
+      startTheWeek();
+    }
+  };
+
+  const handleResetPointsBar = async () => {
+    const result = await Swal.fire({
+      title: "Reset Points?",
+      text: "This will reset your weekly points to 0. This action cannot be undone. Continue?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetPointsBar();
+    }
+  };
+
+  const handleResetTaskCompletionCount = async (index) => {
+    const task = userData.tasks[index];
+    const result = await Swal.fire({
+      title: "Reset Task?",
+      text: `This will reset the completion count for "${task.name}" to 0. Continue?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetTaskCompletionCount(index);
+    }
+  };
+  const handleResetMonthlyPointsBar = async () => {
+    const result = await Swal.fire({
+      title: "Reset Monthly Points?",
+      text: "This will reset your monthly points to 0. This action cannot be undone. Continue?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Reset",
+      confirmButtonColor: "#ffc107",
+    });
+    if (result.isConfirmed) {
+      resetMonthlyPointsBar();
+    }
+  };
   const styles = {
     container: {
       padding: 0,
@@ -568,37 +581,7 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
           </div>
         </div>
       )}
-      {notifications
-        .filter((n) => n.global && !dismissedNotifications.includes(n.id))
-        .map((notification) => (
-          <React.Fragment key={notification.id}>
-            <div
-              style={styles.tutorialOverlay}
-              onClick={() => dismissNotification(notification.id)}
-            ></div>
-            <div
-              style={styles.notificationModal}
-              className="notification-modal"
-            >
-              <h3
-                style={{
-                  marginBottom: "12px",
-                  fontWeight: "bold",
-                  fontSize: "14px",
-                }}
-              >
-                Notification
-              </h3>
-              <div style={styles.tutorialContent}>{notification.message}</div>
-              <button
-                onClick={() => dismissNotification(notification.id)}
-                style={styles.notificationButton}
-              >
-                Close
-              </button>
-            </div>
-          </React.Fragment>
-        ))}
+
       <nav style={styles.normalModeNav} className="normalmodenav">
         <div className="nav-brand">
           <img src="/trackerLogo.png" alt="Logo" style={styles.navLogo} />
@@ -777,7 +760,7 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       </div>
                       <div style={{ width: "100%", marginTop: "4px" }}>
                         <button
-                          onClick={resetPointsBar}
+                          onClick={handleResetPointsBar}
                           style={{ width: "100%" }}
                           className="btn btn-warning btn-sm"
                         >
@@ -835,7 +818,7 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       </div>
                       <div style={{ width: "100%", marginTop: "4px" }}>
                         <button
-                          onClick={resetMonthlyPointsBar}
+                          onClick={handleResetMonthlyPointsBar}
                           style={{ width: "100%" }}
                           className="btn btn-warning btn-sm"
                         >
@@ -918,7 +901,7 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                 }}
               >
                 <button
-                  onClick={startTheWeek}
+                  onClick={handleStartTheWeek}
                   style={styles.startWeekButton}
                   className="btn start-week-button"
                 >
@@ -1099,7 +1082,7 @@ const WeeklyModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                             </button>
                                             <button
                                               onClick={() =>
-                                                resetTaskCompletionCount(
+                                                handleResetTaskCompletionCount(
                                                   originalIndex
                                                 )
                                               }
