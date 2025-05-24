@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { auth } from "../firebase";
 import { useNormalModeLogic } from "./NormalModeLogic";
@@ -12,7 +12,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     userData,
     notifications,
     setNotifications,
-    openSections,
     isLoading,
     isSyncing,
     selectedTaskIndex,
@@ -20,8 +19,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     selectedBoost,
     setSelectedBoost,
     taskTimes,
-    groupedTasks,
-    toggleSection,
     handleModeChange,
     applyBoost,
     removeBoost,
@@ -57,20 +54,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
   const [adminSelectedTaskId, setAdminSelectedTaskId] = React.useState("");
   const [adminSelectedBoost, setAdminSelectedBoost] = React.useState("");
   const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = React.useState(false);
-
-  const showTaskDescription = (taskId) => {
-    const task = globalTasks[taskId];
-    if (!task) return;
-    Swal.fire({
-      title: task.name,
-      text: `Summary: ${task.summary || "No summary"}\nPoints: ${
-        task.points
-      }\nDaily Limit: ${task.dailyLimit}\nPenalty: ${
-        task.penalty || task.penaltyPoints || "None"
-      }\nWeekly Goal: ${task.numberLimit} times`,
-      icon: "info",
-    });
-  };
+  const [activeTab, setActiveTab] = useState("Tasks");
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -92,6 +76,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       resetMonthlyPointsBar();
     }
   };
+
   const handleStartTheDay = async () => {
     const result = await Swal.fire({
       title: "Start New Day?",
@@ -148,6 +133,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       resetTaskCompletionCount(index);
     }
   };
+
   const handleSaveProgress = async () => {
     try {
       await syncWithFirebase(true);
@@ -171,10 +157,13 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     dashboardContent: { marginTop: "60px", flex: 1, zIndex: 10 },
     dashboardCard: {
       borderRadius: "8px",
-      background: "none",
+      backgroundColor: "transparent",
       boxShadow: "none",
     },
-    cardBody: { padding: "12px" },
+    cardBody: {
+      padding: "12px",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
+    },
     cardTitle: { fontSize: "14px", fontWeight: 600 },
     listGroupItem: { backgroundColor: "transparent", border: "none" },
     penaltyListGroupItem: {
@@ -190,15 +179,36 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       padding: "4px 8px",
       borderRadius: "4px",
       width: "120px",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     taskNotification: {
       position: "absolute",
       top: "-20px",
-      right: "0",
+      right: "10px",
       fontSize: "12px",
-      color: "#28a745",
+      color: "#000000",
       fontWeight: "bold",
       animation: "popUp 3s ease-out forwards",
+      backgroundColor: "rgba(255, 255, 255, 0.7)",
+      padding: "4px 8px",
+      borderRadius: "4px",
+    },
+    taskCardOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: "8px",
+      zIndex: 10,
+    },
+    taskCardOverlayIcon: {
+      fontSize: "64px",
+      color: "#90EE90",
     },
     pointsProgress: {
       textAlign: "center",
@@ -240,10 +250,12 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
     },
     timesInput: {
       width: "80px",
-      padding: "8px",
+      padding: "10px",
       fontSize: "16px",
       borderRadius: "6px",
       marginLeft: "10px",
+      marginTop: "12px",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     saveProgressButton: {
       margin: "10px",
@@ -253,6 +265,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       border: "none",
       borderRadius: "6px",
       transition: "background-color 0.2s",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     saveProgressButtonSaving: {
       backgroundColor: "#0056b3",
@@ -271,6 +284,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       justifyContent: "center",
       boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       transition: "transform 0.2s, background 0.2s",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     startDayButton: {
       margin: "10px",
@@ -285,6 +299,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       justifyContent: "center",
       boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       transition: "transform 0.2s, background 0.2s",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     normalmodenav: {
       position: "fixed",
@@ -296,6 +311,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       justifyContent: "space-between",
       alignItems: "center",
       zIndex: 1000,
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     profileSection: {
       position: "relative",
@@ -313,6 +329,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       justifyContent: "center",
       boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       transition: "box-shadow 0.2s, background 0.2s",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     achievementsModal: {
       position: "fixed",
@@ -327,6 +344,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
       zIndex: 2000,
       overflowY: "auto",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     overlay: {
       position: "fixed",
@@ -357,7 +375,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       borderRadius: "12px",
       boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
       zIndex: 2002,
-      fontFamily: "'Arial', sans-serif",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     tutorialOverlay: {
       position: "fixed",
@@ -381,6 +399,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       borderRadius: "6px",
       cursor: "pointer",
       fontWeight: "bold",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     notificationModal: {
       position: "fixed",
@@ -395,7 +414,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       borderRadius: "12px",
       boxShadow: "0 8px 16px rgba(0, 0, 0, 0.3)",
       zIndex: 2002,
-      fontFamily: "'Arial', sans-serif",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     notificationButton: {
       backgroundColor: "#dc3545",
@@ -405,6 +424,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       borderRadius: "6px",
       cursor: "pointer",
       fontWeight: "bold",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     feedbackButton: {
       margin: "10px",
@@ -419,6 +439,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       justifyContent: "center",
       boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
       transition: "transform 0.2s, background 0.2s",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
     },
     importantSection: {
       marginBottom: "20px",
@@ -431,67 +452,203 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
       color: "#dc3545",
       padding: "10px",
       textAlign: "center",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
+    },
+    streakInfo: {
+      marginLeft: "8px",
+      color: "#ff4500",
+      fontWeight: "bold",
+      fontSize: "14px",
+      display: "inline-flex",
+      alignItems: "center",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
+    },
+    taskCard: {
+      backgroundColor: "rgba(30, 30, 30, 0.85)",
+      color: "#ffffff",
+      borderRadius: "8px",
+      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+      padding: "24px",
+      margin: "12px",
+      minHeight: "260px",
+      position: "relative",
+      display: "flex",
+      flexDirection: "column",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
+    },
+    taskCardHeader: {
+      display: "flex",
+      alignItems: "center",
+      marginBottom: "16px",
+      flexWrap: "wrap",
+    },
+    taskCardBody: {
+      fontSize: "16px",
+      marginBottom: "16px",
+      flex: 1,
+      lineHeight: 1.8,
+    },
+    taskCardFooter: {
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      flexWrap: "wrap",
+    },
+    taskCardContainer: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+      gap: "16px",
+      padding: "16px",
+    },
+    navTabs: {
+      display: "flex",
+      justifyContent: "center",
+      gap: "8px",
+      marginBottom: "16px",
+      flexWrap: "wrap",
+    },
+    navTabButton: {
+      padding: "10px 20px",
+      minWidth: "100px",
+      border: "none",
+      borderRadius: "6px",
+      fontSize: "14px",
+      fontWeight: "600",
+      cursor: "pointer",
+      transition: "transform 0.2s, background 0.2s",
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
+    },
+    navTabButtonActive: {
+      background: "linear-gradient(135deg, #007bff, #0056b3)",
+      color: "white",
+    },
+    navTabButtonInactive: {
+      background: "#4a4a4a",
+      color: "#e0e0e0",
+    },
+    iconField: {
+      display: "inline-flex",
+      alignItems: "center",
+      fontSize: "16px",
+    },
+    iconButton: {
+      display: "inline-flex",
+      alignItems: "center",
+      fontSize: "16px",
     },
   };
 
   const stylesString = `
-   @keyframes popUp { 0% { opacity: 0; transform: translateY(-10px); } 50% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-10px); } }
-  @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-  
-  /* Button hover effects */
-  .switch-button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    background: linear-gradient(135deg, #117a8b, #0d5f6e);
-  }
-  .start-day-button:hover {
-    transform: scale(1.05);
-    background: linear-gradient(135deg, #0056b3, #003d80);
-  }
-  .start-week-button:hover {
-    transform: scale(1.05);
-    background: linear-gradient(135deg, #1e7e34, #155927);
-  }
-  .apply-global-boost-button:hover {
-    transform: scale(1.05);
-    background: linear-gradient(135deg, #a71d2a, #7a1a1f);
-  }
-  .feedback-button:hover {
-    transform: scale(1.05);
-    background: linear-gradient(135deg, #0056b3, #003d80);
-  }
-  .save-progress-button:hover {
-    transform: scale(1.05);
-    background: #0056b3;
-  }
-  .btn-success:hover {
-    transform: scale(1.05);
-    background: #218838;
-  }
-  .btn-danger:hover {
-    transform: scale(1.05);
-    background: #c82333;
-  }
-  .btn-warning:hover {
-    transform: scale(1.05);
-    background: #e0a800;
-  }
-  .btn-info:hover {
-    transform: scale(1.05);
-    background: #138496;
-  }
-  .btn-primary:hover {
-    transform: scale(1.05);
-    background: #0069d9;
-  }
-  .nav-logout:hover {
-    transform: scale(1.05);
-    background: #dc3545;
-  }
-  .reset-is-ready-button:hover {
-    transform: scale(1.05);
-    background: linear-gradient(135deg, #c82333, #a71d2a);
-  }
+    @keyframes popUp { 0% { opacity: 0; transform: translateY(-10px); } 50% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-10px); } }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    
+    /* Button hover effects */
+    .switch-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      background: linear-gradient(135deg, #117a8b, #0d5f6e);
+    }
+    .start-day-button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #0056b3, #003d80);
+    }
+    .start-week-button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #1e7e34, #155927);
+    }
+    .apply-global-boost-button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #a71d2a, #7a1a1f);
+    }
+    .feedback-button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #0056b3, #003d80);
+    }
+    .save-progress-button:hover {
+      transform: scale(1.05);
+      background: #0056b3;
+    }
+    .btn-complete {
+      background: linear-gradient(135deg, #90EE90, #66CDAA);
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .btn-complete:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #78D878, #55B295);
+    }
+    .btn-complete:disabled {
+      background: #cccccc;
+      cursor: not-allowed;
+    }
+    .btn-danger:hover {
+      transform: scale(1.05);
+      background: #c82333;
+    }
+    .btn-warning:hover {
+      transform: scale(1.05);
+      background: #e0a800;
+    }
+    .btn-info:hover {
+      transform: scale(1.05);
+      background: #138496;
+    }
+    .btn-primary:hover {
+      transform: scale(1.05);
+      background: #0069d9;
+    }
+    .nav-logout:hover {
+      transform: scale(1.05);
+      background: #dc3545;
+    }
+    .reset-is-ready-button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #c82333, #a71d2a);
+    }
+    .nav-tab-button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #606060, #4a4a4a);
+      color: #ffffff;
+    }
+    .nav-tab-button-active:hover {
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      color: white;
+    }
+    /* Task card hover effect */
+    .task-card:hover {
+      transform: scale(1.03);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    /* Responsive grid */
+    @media (max-width: 768px) {
+      .task-card-container {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 12px;
+        padding: 12px;
+      }
+      .task-card {
+        margin: 8px;
+      }
+    }
+    @media (max-width: 576px) {
+      .task-card-container {
+        grid-template-columns: repeat(auto-fit, minmax(100%, 1fr));
+        gap: 12px;
+        padding: 12px;
+      }
+      .task-card {
+        margin: 8px;
+      }
+      .nav-tabs {
+        flex-direction: column;
+        gap: 8px;
+        align-items: center;
+      }
+    }
   `;
 
   const toggleAchievementSection = (category) => {
@@ -634,7 +791,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                         }
                       </span>
                     </div>
-                    {/* Checkbox for isReady using handleReadyChange */}
                     <div className="mt-3">
                       <label className="d-flex align-items-center">
                         <input
@@ -651,7 +807,6 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                   </div>
                 </div>
               </div>
-              {/* Important Section */}
               <div className="row mb-4">
                 <div className="col-12">
                   <div style={styles.dashboardCard} className="card shadow-sm">
@@ -775,8 +930,8 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                         <option value="">Select a Task</option>
                         {userData.tasks.map(
                           (task, originalIndex) =>
-                            task.category === "Task" && (
-                              <option key={originalIndex} value={originalIndex}>
+                            task.category !== "Bonus" && (
+                              <option key={task.taskId} value={originalIndex}>
                                 {task.name}{" "}
                                 {task.boost ? `(${task.boost})` : ""}
                               </option>
@@ -914,7 +1069,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
             )}
 
             <div className="row mb-4" id="start-buttons">
-              <div className="d-flex justify-content-between">
+              <div className="d-flex justify-content-between flex-wrap">
                 <button
                   onClick={handleStartTheDay}
                   style={styles.startDayButton}
@@ -961,7 +1116,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
             </div>
 
             <div className="row">
-              <div className="col-12 col-md-6 mb-3">
+              <div className="col-12 mb-3">
                 <div
                   style={styles.dashboardCard}
                   className="card shadow-sm h-100"
@@ -969,214 +1124,257 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                 >
                   <div style={styles.cardBody}>
                     <h6 style={styles.cardTitle}>Daily Tasks</h6>
-                    <div className="accordion">
-                      {Object.entries(groupedTasks).map(
-                        ([category, categoryTasks]) => (
-                          <div className="accordion-item" key={category}>
-                            <h2 className="accordion-header">
-                              <button
-                                className={`accordion-button ${
-                                  !openSections[category] ? "collapsed" : ""
-                                } text-dark`}
-                                onClick={() => toggleSection(category)}
-                                aria-expanded={openSections[category]}
+                    <div style={styles.navTabs} className="nav-tabs">
+                      <button
+                        style={{
+                          ...styles.navTabButton,
+                          ...(activeTab === "Tasks"
+                            ? styles.navTabButtonActive
+                            : styles.navTabButtonInactive),
+                        }}
+                        className="nav-tab-button nav-tab-button-active"
+                        onClick={() => setActiveTab("Tasks")}
+                      >
+                        Tasks
+                      </button>
+                      <button
+                        style={{
+                          ...styles.navTabButton,
+                          ...(activeTab === "Bonus"
+                            ? styles.navTabButtonActive
+                            : styles.navTabButtonInactive),
+                        }}
+                        className="nav-tab-button"
+                        onClick={() => setActiveTab("Bonus")}
+                      >
+                        Bonus
+                      </button>
+                    </div>
+                    <div
+                      style={styles.taskCardContainer}
+                      className="task-card-container"
+                    >
+                      {userData.tasks.length > 0 ? (
+                        userData.tasks
+                          .map((task, originalIndex) => ({
+                            task,
+                            originalIndex,
+                          }))
+                          .filter(({ task }) =>
+                            activeTab === "Tasks"
+                              ? task.category !== "Bonus"
+                              : task.category === "Bonus"
+                          )
+                          .map(({ task, originalIndex }) => {
+                            const isCompleteDisabled =
+                              task.dailyCounter >= task.dailyLimit;
+                            const isBonusClaimable =
+                              task.category !== "Bonus" &&
+                              task.completionCount >= task.numberLimit &&
+                              !task.bonusClaimed;
+                            return (
+                              <div
+                                key={task.taskId}
+                                style={styles.taskCard}
+                                className="task-card"
+                                id={`task-${task.taskId}`}
                               >
-                                {category} ({categoryTasks.length} tasks)
-                              </button>
-                            </h2>
-                            <div
-                              className={`accordion-collapse collapse ${
-                                openSections[category] ? "show" : ""
-                              }`}
-                            >
-                              <div className="accordion-body p-2">
-                                {categoryTasks.length > 0 ? (
-                                  <ul className="list-group list-group-flush">
-                                    {categoryTasks.map((task, taskIndex) => {
-                                      const originalIndex =
-                                        userData.tasks.findIndex(
-                                          (t) => t.name === task.name
-                                        );
-                                      const taskId = Object.keys(
-                                        globalTasks
-                                      ).find(
-                                        (key) =>
-                                          globalTasks[key].name === task.name
-                                      );
-                                      const isCompleteDisabled =
-                                        task.dailyCounter >= task.dailyLimit;
-                                      const isBonusClaimable =
-                                        task.completionCount >=
-                                          task.numberLimit &&
-                                        !task.bonusClaimed &&
-                                        task.category !== "Bonus";
-                                      return (
-                                        <li
-                                          key={taskIndex}
-                                          style={styles.listGroupItem}
-                                          className="d-flex justify-content-between align-items-center py-1 position-relative"
-                                          id={`task-${originalIndex}`}
-                                        >
-                                          <div className="d-flex align-items-center">
-                                            <span style={{ color: "#dc3545" }}>
-                                              {task.name}
-                                            </span>
-                                            <i
-                                              className="bi bi-exclamation-circle-fill ms-2"
-                                              style={{
-                                                cursor: "pointer",
-                                                color: "#007bff",
-                                              }}
-                                              onClick={() =>
-                                                showTaskDescription(taskId)
-                                              }
-                                            ></i>
-                                            {task.boost && (
-                                              <span className="badge bg-primary ms-2">
-                                                {task.boost}
-                                              </span>
-                                            )}
-                                            {task.hasExceptionalOption && (
-                                              <select
-                                                value={
-                                                  task.selectedMode || "normal"
-                                                }
-                                                onChange={(e) =>
-                                                  handleModeChange(
-                                                    originalIndex,
-                                                    e.target.value
-                                                  )
-                                                }
-                                                style={styles.formSelectSm}
-                                                className="ms-2"
-                                              >
-                                                <option value="normal">
-                                                  Normal
-                                                </option>
-                                                <option value="exceptional">
-                                                  Exceptional
-                                                </option>
-                                                <option value="penalty">
-                                                  Penalty
-                                                </option>
-                                              </select>
-                                            )}
-                                            {task.hasTimesOption && (
-                                              <input
-                                                type="number"
-                                                min="1"
-                                                value={
-                                                  taskTimes[originalIndex] || ""
-                                                }
-                                                onChange={(e) =>
-                                                  handleTimesChange(
-                                                    originalIndex,
-                                                    e.target.value
-                                                  )
-                                                }
-                                                style={styles.timesInput}
-                                                placeholder="Times"
-                                                className="ms-2"
-                                              />
-                                            )}
-                                            <br />
-                                            <small className="text-muted">
-                                              ({task.points} Points{" "}
-                                              {task.penaltyPoints ||
-                                              task.penalty
-                                                ? ` / -${
-                                                    task.penaltyPoints ||
-                                                    task.penalty
-                                                  } Penalty`
-                                                : ""}
-                                              ) | Total: {task.completionCount}/
-                                              {task.numberLimit} | Lifetime:{" "}
-                                              {task.lifetimeCompletionCount} |
-                                              Daily: {task.dailyCounter}/
-                                              {task.dailyLimit}
-                                            </small>
-                                          </div>
-                                          <div className="d-flex align-items-center">
-                                            <button
-                                              onClick={() =>
-                                                completeTask(originalIndex)
-                                              }
-                                              className="btn btn-success btn-sm me-1"
-                                              disabled={isCompleteDisabled}
-                                            >
-                                              Complete
-                                            </button>
-                                            <button
-                                              onClick={() =>
-                                                handleResetTaskCompletionCount(
-                                                  originalIndex
-                                                )
-                                              }
-                                              className="btn btn-warning btn-sm me-1"
-                                            >
-                                              Reset
-                                            </button>
-                                            {task.boost && (
-                                              <button
-                                                onClick={() =>
-                                                  removeBoost(originalIndex)
-                                                }
-                                                className="btn btn-danger btn-sm me-1"
-                                              >
-                                                Remove Boost
-                                              </button>
-                                            )}
-                                            {isBonusClaimable && (
-                                              <button
-                                                onClick={() =>
-                                                  claimBonus(originalIndex)
-                                                }
-                                                className="btn btn-info btn-sm"
-                                              >
-                                                Claim Bonus
-                                              </button>
-                                            )}
-                                          </div>
-                                          {notifications
-                                            .filter(
-                                              (n) =>
-                                                n.position ===
-                                                  `task-${originalIndex}` &&
-                                                !n.global
-                                            )
-                                            .map((notification) => (
-                                              <div
-                                                key={notification.id}
-                                                style={styles.taskNotification}
-                                                className="task-notification"
-                                              >
-                                                {notification.points
-                                                  ? `${
-                                                      notification.points > 0
-                                                        ? "+"
-                                                        : ""
-                                                    }${notification.points}pts`
-                                                  : ""}
-                                              </div>
-                                            ))}
-                                        </li>
-                                      );
-                                    })}
-                                  </ul>
-                                ) : (
-                                  <p className="text-muted small">
-                                    No tasks in this category
-                                  </p>
+                                {isCompleteDisabled && (
+                                  <div style={styles.taskCardOverlay}>
+                                    <i
+                                      className="bi bi-check-circle-fill"
+                                      style={styles.taskCardOverlayIcon}
+                                    ></i>
+                                  </div>
                                 )}
+                                <div style={styles.taskCardHeader}>
+                                  <span style={{ color: "#ff6666" }}>
+                                    {task.name}
+                                  </span>
+                                  {task.streak > 0 && (
+                                    <span style={styles.streakInfo}>
+                                      <i
+                                        className="bi bi-fire me-1"
+                                        style={{
+                                          color: "#ff4500",
+                                          fontSize: "14px",
+                                        }}
+                                      ></i>
+                                      {task.streak}
+                                    </span>
+                                  )}
+                                  {task.boost && (
+                                    <span className="badge bg-primary ms-2">
+                                      <i
+                                        className="bi bi-rocket me-1"
+                                        style={{ fontSize: "12px" }}
+                                      ></i>
+                                      {task.boost}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={styles.taskCardBody}>
+                                  <p className="mb-3" style={styles.iconField}>
+                                    <i
+                                      className="bi bi-coin me-1"
+                                      style={{
+                                        color: "#ffd700",
+                                        fontSize: "16px",
+                                      }}
+                                    ></i>
+                                    <strong>Points:</strong> {task.points}
+                                    {task.penaltyPoints || task.penalty
+                                      ? ` (-${
+                                          task.penaltyPoints || task.penalty
+                                        } penalty)`
+                                      : ""}
+                                  </p>
+                                  <p className="mb-3" style={styles.iconField}>
+                                    <i
+                                      className="bi bi-check-circle me-1"
+                                      style={{
+                                        color: "#28a745",
+                                        fontSize: "16px",
+                                      }}
+                                    ></i>
+                                    <strong>Completion:</strong>{" "}
+                                    {task.completionCount}/{task.numberLimit}
+                                  </p>
+                                  <p className="mb-3" style={styles.iconField}>
+                                    <i
+                                      className="bi bi-infinity me-1"
+                                      style={{
+                                        color: "#17a2b8",
+                                        fontSize: "16px",
+                                      }}
+                                    ></i>
+                                    <strong>Lifetime:</strong>{" "}
+                                    {task.lifetimeCompletionCount}
+                                  </p>
+                                  <p className="mb-3" style={styles.iconField}>
+                                    <i
+                                      className="bi bi-clock me-1"
+                                      style={{
+                                        color: "#aaaaaa",
+                                        fontSize: "16px",
+                                      }}
+                                    ></i>
+                                    <strong>Daily:</strong> {task.dailyCounter}/
+                                    {task.dailyLimit}
+                                  </p>
+                                  {task.hasTimesOption && (
+                                    <div className="mt-3">
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={taskTimes[originalIndex] || ""}
+                                        onChange={(e) =>
+                                          handleTimesChange(
+                                            originalIndex,
+                                            e.target.value
+                                          )
+                                        }
+                                        style={styles.timesInput}
+                                        placeholder="Times"
+                                        className="form-control form-control-sm"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                                <div style={styles.taskCardFooter}>
+                                  <button
+                                    onClick={() => completeTask(originalIndex)}
+                                    className="btn btn-complete btn-sm"
+                                    disabled={isCompleteDisabled}
+                                    style={styles.iconButton}
+                                  >
+                                    <i
+                                      className="bi bi-check2 me-1"
+                                      style={{ fontSize: "16px" }}
+                                    ></i>
+                                    Complete
+                                  </button>
+                                  {task.category !== "Bonus" &&
+                                    task.hasExceptionalOption && (
+                                      <select
+                                        value={task.selectedMode || "normal"}
+                                        onChange={(e) =>
+                                          handleModeChange(
+                                            originalIndex,
+                                            e.target.value
+                                          )
+                                        }
+                                        style={styles.formSelectSm}
+                                        className="form-select form-select-sm"
+                                      >
+                                        <option value="normal">Normal</option>
+                                        <option value="exceptional">
+                                          Exceptional
+                                        </option>
+                                        <option value="penalty">Penalty</option>
+                                      </select>
+                                    )}
+                                  {task.boost && (
+                                    <button
+                                      onClick={() => removeBoost(originalIndex)}
+                                      className="btn btn-danger btn-sm"
+                                      style={styles.iconButton}
+                                    >
+                                      <i
+                                        className="bi bi-x-circle me-1"
+                                        style={{ fontSize: "16px" }}
+                                      ></i>
+                                      Remove Boost
+                                    </button>
+                                  )}
+                                  {isBonusClaimable && (
+                                    <button
+                                      onClick={() => claimBonus(originalIndex)}
+                                      className="btn btn-info btn-sm"
+                                      style={styles.iconButton}
+                                    >
+                                      <i
+                                        className="bi bi-gift me-1"
+                                        style={{ fontSize: "16px" }}
+                                      ></i>
+                                      Claim Bonus
+                                    </button>
+                                  )}
+                                </div>
+                                {notifications
+                                  .filter(
+                                    (n) =>
+                                      n.position === `task-${task.taskId}` &&
+                                      !n.global
+                                  )
+                                  .map((notification) => (
+                                    <div
+                                      key={notification.id}
+                                      style={styles.taskNotification}
+                                      className="task-notification"
+                                    >
+                                      {notification.points
+                                        ? `${
+                                            notification.points > 0 ? "+" : ""
+                                          }${notification.points}pts`
+                                        : ""}
+                                    </div>
+                                  ))}
                               </div>
-                            </div>
-                          </div>
-                        )
+                            );
+                          })
+                      ) : (
+                        <p className="text-muted small">
+                          No {activeTab.toLowerCase()} available
+                        </p>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="row">
               <div className="col-12 col-md-6 mb-3">
                 <div
                   style={styles.dashboardCard}
@@ -1190,7 +1388,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                           .filter((task) => task.dailyCounter > 0)
                           .map((task, index) => (
                             <li
-                              key={index}
+                              key={task.taskId}
                               style={
                                 task.isPenalty
                                   ? styles.penaltyListGroupItem
@@ -1247,7 +1445,7 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                           <ul className="list-group list-group-flush">
                             {userData.completedTasks.map((task, index) => (
                               <li
-                                key={index}
+                                key={task.taskId}
                                 style={
                                   task.isPenalty
                                     ? styles.penaltyListGroupItem
@@ -1285,99 +1483,112 @@ const NormalMode = ({ globalTasks, refreshGlobalTasks }) => {
                 </div>
               </div>
             </div>
+
+            {isAchievementsOpen && (
+              <>
+                <div style={styles.overlay} onClick={toggleAchievements}></div>
+                <div style={styles.achievementsModal}>
+                  <h5>Achievements</h5>
+                  <button
+                    onClick={toggleAchievements}
+                    className="btn btn-danger float-end"
+                  >
+                    Close
+                  </button>
+                  <div style={styles.achievementsContainer}>
+                    {sortedCategories.map((category) => {
+                      const achievements =
+                        JSON.parse(
+                          localStorage.getItem("achievements") || "{}"
+                        )[category] || [];
+                      return (
+                        <div key={category} style={styles.achievementSection}>
+                          <h6>
+                            <button
+                              className={`btn btn-link ${
+                                !openAchievementSections[category]
+                                  ? "collapsed"
+                                  : ""
+                              }`}
+                              onClick={() => toggleAchievementSection(category)}
+                              style={{ textDecoration: "none", color: "#000" }}
+                            >
+                              {category} ({achievements.length})
+                            </button>
+                          </h6>
+                          {openAchievementSections[category] && (
+                            <ul className="list-group">
+                              {achievements.map((achievement) => {
+                                const task = userData.tasks.find(
+                                  (t) => t.taskId === achievement.taskId
+                                );
+                                const progress = task
+                                  ? task.lifetimeCompletionCount
+                                  : 0;
+                                const isEarned =
+                                  !!userData.achievements[achievement.name];
+                                const starColor = isEarned
+                                  ? {
+                                      bronze: "#cd7f32",
+                                      silver: "#c0c0c0",
+                                      gold: "#ffd700",
+                                    }[
+                                      userData.achievements[achievement.name]
+                                        .star
+                                    ]
+                                  : "#ccc";
+                                return (
+                                  <li
+                                    key={achievement.name}
+                                    className="list-group-item d-flex justify-content-between align-items-center"
+                                  >
+                                    <div>
+                                      <span
+                                        style={{
+                                          fontWeight: isEarned
+                                            ? "bold"
+                                            : "normal",
+                                          color: isEarned ? "#28a745" : "#000",
+                                        }}
+                                      >
+                                        {achievement.name} -{" "}
+                                        {achievement.description}
+                                      </span>
+                                      <br />
+                                      <small>
+                                        Progress: {progress}/
+                                        {achievement.target}{" "}
+                                        {isEarned
+                                          ? `(Earned: ${new Date(
+                                              userData.achievements[
+                                                achievement.name
+                                              ].earnedAt
+                                            ).toLocaleDateString()})`
+                                          : ""}
+                                      </small>
+                                    </div>
+                                    <i
+                                      className="bi bi-star-fill"
+                                      style={{
+                                        color: starColor,
+                                        fontSize: "20px",
+                                      }}
+                                    ></i>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
-      {isAchievementsOpen && (
-        <>
-          <div style={styles.overlay} onClick={toggleAchievements}></div>
-          <div style={styles.achievementsModal}>
-            <h5>Achievements</h5>
-            <button
-              onClick={toggleAchievements}
-              className="btn btn-danger float-end"
-            >
-              Close
-            </button>
-            <div style={styles.achievementsContainer}>
-              {sortedCategories.map((category) => {
-                const achievements =
-                  JSON.parse(localStorage.getItem("achievements") || "{}")[
-                    category
-                  ] || [];
-                return (
-                  <div key={category} style={styles.achievementSection}>
-                    <h6>
-                      <button
-                        className={`btn btn-link ${
-                          !openAchievementSections[category] ? "collapsed" : ""
-                        }`}
-                        onClick={() => toggleAchievementSection(category)}
-                        style={{ textDecoration: "none", color: "#000" }}
-                      >
-                        {category} ({achievements.length})
-                      </button>
-                    </h6>
-                    {openAchievementSections[category] && (
-                      <ul className="list-group">
-                        {achievements.map((achievement) => {
-                          const task = userData.tasks.find(
-                            (t) => t.taskId === achievement.taskId
-                          );
-                          const progress = task
-                            ? task.lifetimeCompletionCount
-                            : 0;
-                          const isEarned =
-                            !!userData.achievements[achievement.name];
-                          const starColor = isEarned
-                            ? {
-                                bronze: "#cd7f32",
-                                silver: "#c0c0c0",
-                                gold: "#ffd700",
-                              }[userData.achievements[achievement.name].star]
-                            : "#ccc";
-                          return (
-                            <li
-                              key={achievement.name}
-                              className="list-group-item d-flex justify-content-between align-items-center"
-                            >
-                              <div>
-                                <span
-                                  style={{
-                                    fontWeight: isEarned ? "bold" : "normal",
-                                    color: isEarned ? "#28a745" : "#000",
-                                  }}
-                                >
-                                  {achievement.name} - {achievement.description}
-                                </span>
-                                <br />
-                                <small>
-                                  Progress: {progress}/{achievement.target}{" "}
-                                  {isEarned
-                                    ? `(Earned: ${new Date(
-                                        userData.achievements[
-                                          achievement.name
-                                        ].earnedAt
-                                      ).toLocaleDateString()})`
-                                    : ""}
-                                </small>
-                              </div>
-                              <i
-                                className="bi bi-star-fill"
-                                style={{ color: starColor, fontSize: "20px" }}
-                              ></i>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { auth, database } from "../firebase"; // Add messaging import
+import { auth, database } from "../firebase";
 import { signOut, getAuth } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { ref, get, update, getDatabase, onValue, set } from "firebase/database";
@@ -32,7 +32,6 @@ const BOOSTS = {
   },
 };
 
-// Map categories to star types
 const STAR_TYPES = {
   Average: "bronze",
   Advanced: "silver",
@@ -71,6 +70,9 @@ export const useNormalModeLogic = (
           false,
         selectedMode: parsedData.tasks[taskId]?.selectedMode || "normal",
         bonusClaimed: parsedData.tasks[taskId]?.bonusClaimed || false,
+        streakType: cachedGlobalTasks[taskId]?.streakType || null,
+        streak: parsedData.tasks[taskId]?.streak || 0,
+        maxStreak: parsedData.tasks[taskId]?.maxStreak || 0,
       }));
     } else {
       initialTasks = Object.keys(cachedGlobalTasks).map((taskId) => ({
@@ -83,6 +85,9 @@ export const useNormalModeLogic = (
         hasTimesOption: cachedGlobalTasks[taskId].hasTimesOption || false,
         selectedMode: "normal",
         bonusClaimed: false,
+        streakType: cachedGlobalTasks[taskId]?.streakType || null,
+        streak: 0,
+        maxStreak: 0,
       }));
     }
 
@@ -97,7 +102,7 @@ export const useNormalModeLogic = (
       achievements: parsedData.achievements || {},
       lastUpdated: parsedData.lastUpdated || Date.now(),
       isReady: parsedData.isReady || false,
-      lastNotification: parsedData.lastNotification || null, // Add lastNotification
+      lastNotification: parsedData.lastNotification || null,
     };
   });
   const [notifications, setNotifications] = useState([]);
@@ -180,6 +185,9 @@ export const useNormalModeLogic = (
                 hasTimesOption: task.hasTimesOption || false,
                 selectedMode: task.selectedMode || "normal",
                 bonusClaimed: task.bonusClaimed || false,
+                streakType: task.streakType || null,
+                streak: task.streak || 0,
+                maxStreak: task.maxStreak || 0,
               },
             ])
           );
@@ -188,7 +196,7 @@ export const useNormalModeLogic = (
             ...localData,
             tasks: tasksToSync,
             lastUpdated: Date.now(),
-            lastNotification: localData.lastNotification || null, // Sync lastNotification
+            lastNotification: localData.lastNotification || null,
           });
         }
       } catch (error) {
@@ -224,6 +232,7 @@ export const useNormalModeLogic = (
           JSON.parse(localStorage.getItem("achievements")) ||
           achievementsSnapshot.val() ||
           {};
+
         localStorage.setItem(
           "achievements",
           JSON.stringify(cachedAchievements)
@@ -244,6 +253,9 @@ export const useNormalModeLogic = (
               false,
             selectedMode: userTask.selectedMode || "normal",
             bonusClaimed: userTask.bonusClaimed || false,
+            streakType: cachedGlobalTasks[taskId]?.streakType || null,
+            streak: userTask.streak || 0,
+            maxStreak: userTask.maxStreak || 0,
           };
         });
 
@@ -261,7 +273,7 @@ export const useNormalModeLogic = (
           currentWeek: firebaseData.currentWeek || 1,
           isReady: firebaseData.isReady ?? false,
           adminMessage: firebaseData.adminMessage || "",
-          lastNotification: firebaseData.lastNotification || null, // Add lastNotification
+          lastNotification: firebaseData.lastNotification || null,
         };
 
         localStorage.setItem(
@@ -619,11 +631,29 @@ export const useNormalModeLogic = (
       }
       const totalPoints = effectivePoints * times;
 
+      // Update streak for daily and weekly tasks
+      let newStreak = task.streak;
+      let newMaxStreak = task.maxStreak;
+      if (task.category !== "Bonus") {
+        if (task.streakType === "daily") {
+          newStreak = task.streak + times; // Increment streak for daily tasks
+          newMaxStreak = Math.max(newMaxStreak, newStreak);
+        } else if (
+          task.streakType === "weekly" &&
+          newCompletionCount >= task.numberLimit
+        ) {
+          newStreak = task.streak + 1; // Increment streak for perfect week
+          newMaxStreak = Math.max(newMaxStreak, newStreak);
+        }
+      }
+
       const updatedTask = {
         ...task,
         completionCount: newCompletionCount,
         lifetimeCompletionCount: newLifetimeCompletionCount,
         dailyCounter: task.dailyCounter + times,
+        streak: newStreak,
+        maxStreak: newMaxStreak,
       };
       const newTasks = userData.tasks.map((t, i) =>
         i === index ? updatedTask : t
@@ -650,6 +680,9 @@ export const useNormalModeLogic = (
           dailyLimit: task.dailyLimit,
           dailyCounter: times,
           penaltyPoints: task.penaltyPoints || task.penalty || 0,
+          streakType: task.streakType || null,
+          streak: newStreak,
+          maxStreak: newMaxStreak,
           ...(task.hasExceptionalOption
             ? {
                 selectedMode: task.selectedMode || "normal",
@@ -666,6 +699,8 @@ export const useNormalModeLogic = (
           points: existingTask.points + totalPoints,
           completionCount: existingTask.completionCount + times,
           dailyCounter: existingTask.dailyCounter + times,
+          streak: newStreak,
+          maxStreak: newMaxStreak,
         };
       }
 
@@ -752,6 +787,13 @@ export const useNormalModeLogic = (
           pointsToAdjust = task.basePoints / 2;
       }
 
+      // Adjust streak for daily tasks
+      let newStreak = originalTask.streak;
+      let newMaxStreak = originalTask.maxStreak;
+      if (task.category !== "Bonus" && task.streakType === "daily") {
+        newStreak = Math.max(originalTask.streak - 1, 0);
+      }
+
       const newCompletedTasks = [...userData.completedTasks];
       if (newDailyCounter > 0) {
         newCompletedTasks[index] = {
@@ -759,6 +801,8 @@ export const useNormalModeLogic = (
           completionCount: newCompletionCount,
           points: task.points - pointsToAdjust,
           dailyCounter: newDailyCounter,
+          streak: newStreak,
+          maxStreak: newMaxStreak,
           ...(task.hasTimesOption
             ? { times: Math.max((task.times || task.completionCount) - 1, 0) }
             : {}),
@@ -774,6 +818,8 @@ export const useNormalModeLogic = (
               completionCount: Math.max(t.completionCount - 1, 0),
               lifetimeCompletionCount: newLifetimeCompletionCount,
               dailyCounter: newDailyCounter,
+              streak: newStreak,
+              maxStreak: newMaxStreak,
             }
           : t
       );
@@ -1009,6 +1055,35 @@ export const useNormalModeLogic = (
       weeklyPerformance,
     };
 
+    // Update streaks for weekly tasks only
+    const updatedTasks = userData.tasks.map((task) => {
+      let newStreak = task.streak;
+      let newMaxStreak = task.maxStreak;
+
+      if (task.category !== "Bonus" && task.streakType === "weekly") {
+        const weeklyTask = userData.completedTasks.find(
+          (t) => t.name === task.name
+        );
+        const completionCount = weeklyTask?.completionCount || 0;
+        // Reset streak for non-perfect weekly tasks
+        if (completionCount < task.numberLimit) {
+          newStreak = 0;
+        }
+        // Note: Streak for perfect weeks is incremented in completeTask
+      }
+
+      return {
+        ...task,
+        completionCount: 0,
+        dailyCounter: 0,
+        boost: null,
+        hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
+        bonusClaimed: false,
+        streak: newStreak,
+        maxStreak: newMaxStreak,
+      };
+    });
+
     try {
       const updates = {};
       updates[`users/${userId}/historicalCompletions/${currentWeek}`] =
@@ -1020,7 +1095,7 @@ export const useNormalModeLogic = (
         weekArchive.weeklyPerformance;
       updates[`users/${userId}/currentWeek`] = newWeekNumber;
       updates[`users/${userId}/completedTasks`] = [];
-      updates[`users/${userId}/tasks`] = userData.tasks.reduce((acc, task) => {
+      updates[`users/${userId}/tasks`] = updatedTasks.reduce((acc, task) => {
         acc[task.taskId] = {
           ...task,
           completionCount: 0,
@@ -1028,6 +1103,8 @@ export const useNormalModeLogic = (
           boost: null,
           hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
           bonusClaimed: false,
+          streak: task.streak,
+          maxStreak: task.maxStreak,
         };
         return acc;
       }, {});
@@ -1035,16 +1112,8 @@ export const useNormalModeLogic = (
 
       await update(ref(database), updates);
 
-      const resetTasks = userData.tasks.map((task) => ({
-        ...task,
-        completionCount: 0,
-        dailyCounter: 0,
-        boost: null,
-        hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
-        bonusClaimed: false,
-      }));
       updateLocalData({
-        tasks: resetTasks,
+        tasks: updatedTasks,
         completedTasks: [],
         points: { current: 0, total: 800 },
         currentWeek: newWeekNumber,
@@ -1075,11 +1144,12 @@ export const useNormalModeLogic = (
     }
   }, [userData, updateLocalData, userId, navigate]);
 
-  const startTheDay = useCallback(() => {
+  const startTheDay = useCallback(async () => {
     const doubleOrDieTasks = userData.tasks.filter(
       (task) => task.boost === "DoubleOrDie"
     );
     let penalty = 0;
+    const doubleOrDieMissed = [];
     doubleOrDieTasks.forEach((task) => {
       const completedToday = userData.completedTasks.some(
         (completed) =>
@@ -1087,13 +1157,80 @@ export const useNormalModeLogic = (
       );
       if (!completedToday) {
         penalty += 10;
+        doubleOrDieMissed.push(task.name);
       }
     });
 
-    const resetTasks = userData.tasks.map((task) => ({
-      ...task,
-      dailyCounter: 0,
-    }));
+    // Identify daily tasks that will lose streaks
+    const streakLossTasks = userData.tasks
+      .filter(
+        (task) =>
+          task.category !== "Bonus" &&
+          task.streakType === "daily" &&
+          task.streak > 0
+      )
+      .filter(
+        (task) =>
+          !userData.completedTasks.some(
+            (completed) =>
+              completed.name === task.name && completed.dailyCounter > 0
+          )
+      )
+      .map((task) => task.name);
+
+    // Show warning if there are streak losses or DoubleOrDie penalties
+    if (streakLossTasks.length > 0 || doubleOrDieMissed.length > 0) {
+      const warningMessages = [];
+      if (streakLossTasks.length > 0) {
+        warningMessages.push(
+          `The following daily tasks will lose their streaks: ${streakLossTasks.join(
+            ", "
+          )}.`
+        );
+      }
+      if (doubleOrDieMissed.length > 0) {
+        warningMessages.push(
+          `The following DoubleOrDie tasks were not completed and will deduct 10 points each: ${doubleOrDieMissed.join(
+            ", "
+          )}.`
+        );
+      }
+
+      const result = await Swal.fire({
+        title: "Start New Day?",
+        html: `<div>${warningMessages.join(
+          "<br>"
+        )}<br><br>Continue to reset daily counters?</div>`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Start Day",
+        confirmButtonColor: "#007bff",
+      });
+
+      if (!result.isConfirmed) return;
+    }
+
+    // Update streaks for daily tasks
+    const resetTasks = userData.tasks.map((task) => {
+      if (task.category !== "Bonus" && task.streakType === "daily") {
+        const completedToday = userData.completedTasks.some(
+          (completed) =>
+            completed.name === task.name && completed.dailyCounter > 0
+        );
+        const newStreak = completedToday ? task.streak : 0;
+        return {
+          ...task,
+          dailyCounter: 0,
+          streak: newStreak,
+          maxStreak: task.maxStreak,
+        };
+      }
+      return {
+        ...task,
+        dailyCounter: 0,
+      };
+    });
+
     const resetCompletedTasks = userData.completedTasks.map((task) => ({
       ...task,
       dailyCounter: 0,
@@ -1259,19 +1396,34 @@ export const useNormalModeLogic = (
           weekArchive;
 
         const resetTasks = Object.fromEntries(
-          Object.keys(userTasks).map((taskId) => [
-            taskId,
-            {
-              ...userTasks[taskId],
-              completionCount: 0,
-              dailyCounter: 0,
-              boost: null,
-              hasTimesOption:
-                userTasks[taskId].hasTimesOption &&
-                userTasks[taskId].boost !== "TheSavior",
-              bonusClaimed: false,
-            },
-          ])
+          Object.keys(userTasks).map((taskId) => {
+            const task = userTasks[taskId];
+            const weeklyTask = completedTasks.find((t) => t.name === task.name);
+            const completionCount = weeklyTask?.completionCount || 0;
+            let newStreak = task.streak || 0;
+            let newMaxStreak = task.maxStreak || 0;
+
+            if (task.category !== "Bonus" && task.streakType === "weekly") {
+              if (completionCount < task.numberLimit) {
+                newStreak = 0;
+              }
+            }
+
+            return [
+              taskId,
+              {
+                ...task,
+                completionCount: 0,
+                dailyCounter: 0,
+                boost: null,
+                hasTimesOption:
+                  task.hasTimesOption && task.boost !== "TheSavior",
+                bonusClaimed: false,
+                streak: newStreak,
+                maxStreak: newMaxStreak,
+              },
+            ];
+          })
         );
 
         updates[`users/${userId}/tasks`] = resetTasks;
@@ -1284,14 +1436,32 @@ export const useNormalModeLogic = (
         await update(ref(database), updates);
       }
 
-      const resetTasks = userData.tasks.map((task) => ({
-        ...task,
-        completionCount: 0,
-        dailyCounter: 0,
-        boost: null,
-        hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
-        bonusClaimed: false,
-      }));
+      const resetTasks = userData.tasks.map((task) => {
+        let newStreak = task.streak;
+        let newMaxStreak = task.maxStreak;
+
+        if (task.category !== "Bonus" && task.streakType === "weekly") {
+          const weeklyTask = userData.completedTasks.find(
+            (t) => t.name === task.name
+          );
+          const completionCount = weeklyTask?.completionCount || 0;
+          if (completionCount < task.numberLimit) {
+            newStreak = 0;
+          }
+        }
+
+        return {
+          ...task,
+          completionCount: 0,
+          dailyCounter: 0,
+          boost: null,
+          hasTimesOption: task.hasTimesOption && task.boost !== "TheSavior",
+          bonusClaimed: false,
+          streak: newStreak,
+          maxStreak: newMaxStreak,
+        };
+      });
+
       updateLocalData({
         tasks: resetTasks,
         completedTasks: [],
@@ -1457,7 +1627,7 @@ export const useNormalModeLogic = (
     }
   }, []);
 
-  const resetAllUsersIsReady = async () => {
+  const resetAllUsersIsReady = useCallback(async () => {
     const auth = getAuth();
     const database = getDatabase();
     const user = auth.currentUser;
@@ -1506,7 +1676,7 @@ export const useNormalModeLogic = (
         text: "Could not reset users' isReady status. Please try again.",
       });
     }
-  };
+  }, []);
 
   const viewFeedback = useCallback(async () => {
     try {

@@ -55,7 +55,6 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
 
   const [openAchievementSections, setOpenAchievementSections] = useState({});
   const [isWeeklyTasksOpen, setIsWeeklyTasksOpen] = useState(false);
-
   const [adminSelectedTaskId, setAdminSelectedTaskId] = useState("");
   const [adminSelectedBoost, setAdminSelectedBoost] = useState("");
 
@@ -79,6 +78,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       }
     });
   };
+
   const handleStartTheDay = async () => {
     const result = await Swal.fire({
       title: "Start New Day?",
@@ -135,6 +135,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       resetTaskCompletionCount(index);
     }
   };
+
   const handleResetMonthlyPointsBar = async () => {
     const result = await Swal.fire({
       title: "Reset Monthly Points?",
@@ -193,6 +194,11 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       border: "none",
       fontSize: "12px",
       color: "black",
+    },
+    completedTask: {
+      textDecoration: "line-through",
+      color: "#6c757d",
+      fontSize: "12px",
     },
     penaltyListGroupItem: {
       backgroundColor: "rgba(139, 0, 0, 0.1)",
@@ -485,6 +491,11 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
       transform: scale(1.05);
       background: #138496;
     }
+    .streak-icon { color: #ff4500; font-size: 9px; animation: pulse 2s infinite ease-in-out; }
+    .task-icon, .completed-icon, .penalty-icon { font-size: 12px; }
+    .button-icon { font-size: 9px; }
+    .category-icon { fontSize: 11px; }
+    .completed-task { text-decoration: line-through; color: #6c757d; }
   `;
 
   const toggleAchievementSection = (category) => {
@@ -592,6 +603,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       style={{ ...styles.cardTitle, fontSize: "14px" }}
                       className="text-dark fw-bold mb-1"
                     >
+                      <i className="bi bi-person-circle me-1"></i>
                       {userData.profile.name}
                     </h4>
                     <p className="text-muted" style={{ fontSize: "9px" }}>
@@ -632,7 +644,12 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                         }
                       </span>
                     </div>
-                    {/* Checkbox for isReady using handleReadyChange */}
+                    <div className="mt-1">
+                      <span className="text-muted" style={{ fontSize: "9px" }}>
+                        <i className="bi bi-fire streak-icon me-1"></i>
+                        Streak: {userData.streak || 0}
+                      </span>
+                    </div>
                     <div className="mt-1">
                       <label className="d-flex align-items-center justify-content-center">
                         <input
@@ -885,7 +902,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                       <button
                         onClick={applyBoost}
                         className="btn btn-primary btn-sm mb-2"
-                        style={{ fontSize: "11px", minHeight: "30px" }}
+                        style={{ fontSize: "9px", minHeight: "30px" }}
                       >
                         Apply
                       </button>
@@ -972,6 +989,15 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                   color: "black",
                                 }}
                               >
+                                <i
+                                  className={`bi bi-${
+                                    {
+                                      Average: "list-task",
+                                      Advanced: "gear",
+                                      Master: "award",
+                                    }[category]
+                                  } category-icon me-1`}
+                                ></i>
                                 {category} ({categoryTasks.length})
                               </button>
                             </h2>
@@ -995,15 +1021,40 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                           task.numberLimit &&
                                         !task.bonusClaimed &&
                                         task.category !== "Bonus";
+                                      const isCompleted = isCompleteDisabled;
                                       return (
                                         <li
                                           key={taskIndex}
-                                          style={styles.listGroupItem}
-                                          className="d-flex flex-column py-1 position-relative"
+                                          style={
+                                            isCompleted
+                                              ? {
+                                                  ...styles.listGroupItem,
+                                                  ...styles.completedTask,
+                                                }
+                                              : styles.listGroupItem
+                                          }
+                                          className={`d-flex flex-column py-1 position-relative ${
+                                            isCompleted ? "completed-task" : ""
+                                          }`}
                                           id={`task-${originalIndex}`}
                                         >
                                           <div className="d-flex justify-content-between align-items-center mb-1">
-                                            <span style={{ color: "#dc3545" }}>
+                                            <span
+                                              style={{
+                                                color: task.penalty
+                                                  ? "#dc3545"
+                                                  : isCompleted
+                                                  ? "#6c757d"
+                                                  : "#dc3545",
+                                              }}
+                                            >
+                                              <i
+                                                className={`bi bi-${
+                                                  task.penalty
+                                                    ? "exclamation-triangle"
+                                                    : "check-square"
+                                                } task-icon me-1`}
+                                              ></i>
                                               {task.name}
                                             </span>
                                             {task.boost && (
@@ -1011,6 +1062,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                                 className="badge bg-primary ms-1"
                                                 style={{ fontSize: "9px" }}
                                               >
+                                                <i className="bi bi-rocket me-1"></i>
                                                 {task.boost}
                                               </span>
                                             )}
@@ -1070,6 +1122,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                                 minHeight: "30px",
                                               }}
                                             >
+                                              <i className="bi bi-check button-icon me-1"></i>
                                               Complete
                                             </button>
                                             <button
@@ -1085,6 +1138,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                               }}
                                               disabled={isCompleteDisabled}
                                             >
+                                              <i className="bi bi-arrow-counterclockwise button-icon me-1"></i>
                                               Reset
                                             </button>
                                             {task.boost && (
@@ -1098,6 +1152,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                                   minHeight: "30px",
                                                 }}
                                               >
+                                                <i className="bi bi-x button-icon me-1"></i>
                                                 Remove
                                               </button>
                                             )}
@@ -1112,6 +1167,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                                   minHeight: "30px",
                                                 }}
                                               >
+                                                <i className="bi bi-gift button-icon me-1"></i>
                                                 Claim Bonus
                                               </button>
                                             )}
@@ -1128,10 +1184,12 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                                 }`
                                               : ""}{" "}
                                             ) | Total: {task.completionCount}/
-                                            {task.numberLimit}| Lifetime:{" "}
+                                            {task.numberLimit} | Lifetime:{" "}
                                             {task.lifetimeCompletionCount} |
                                             Daily: {task.dailyCounter}/
-                                            {task.dailyLimit}
+                                            {task.dailyLimit} |{" "}
+                                            <i className="bi bi-fire streak-icon me-1"></i>
+                                            Streak: {task.streak || 0}
                                           </small>
                                           {notifications
                                             .filter(
@@ -1191,6 +1249,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 className="d-flex justify-content-between align-items-center py-1"
                               >
                                 <span>
+                                  <i className="bi bi-exclamation-circle penalty-icon me-1"></i>
                                   {task.name}{" "}
                                   <span className="fw-bold">Penalized</span>
                                 </span>
@@ -1199,6 +1258,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                   className="btn btn-danger btn-sm"
                                   style={{ fontSize: "9px", minHeight: "30px" }}
                                 >
+                                  <i className="bi bi-arrow-left button-icon me-1"></i>
                                   Undo
                                 </button>
                               </li>
@@ -1209,12 +1269,13 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 className="d-flex justify-content-between align-items-center py-1"
                               >
                                 <span>
+                                  <i className="bi bi-check-circle completed-icon me-1"></i>
                                   <span className="fw-bold text-dark">
                                     {task.dailyCounter}x
                                   </span>{" "}
                                   {task.name}{" "}
                                   <small className="text-muted">
-                                    ({task.daylyCounter}/{task.dailyLimit})
+                                    ({task.dailyCounter}/{task.dailyLimit})
                                   </small>
                                 </span>
                                 <button
@@ -1222,6 +1283,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                   className="btn btn-danger btn-sm"
                                   style={{ fontSize: "9px", minHeight: "30px" }}
                                 >
+                                  <i className="bi bi-arrow-left button-icon me-1"></i>
                                   Undo
                                 </button>
                               </li>
@@ -1251,6 +1313,11 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                         className="btn btn-sm btn-outline-primary"
                         style={{ fontSize: "9px", minHeight: "30px" }}
                       >
+                        <i
+                          className={`bi bi-${
+                            isWeeklyTasksOpen ? "eye-slash" : "eye"
+                          } button-icon me-1`}
+                        ></i>
                         {isWeeklyTasksOpen ? "Hide" : "Show"}
                       </button>
                     </div>
@@ -1265,6 +1332,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 className="d-flex justify-content-between align-items-center py-1"
                               >
                                 <span>
+                                  <i className="bi bi-exclamation-circle penalty-icon me-1"></i>
                                   {task.name}{" "}
                                   <span className="fw-bold">Penalized</span>
                                 </span>
@@ -1273,6 +1341,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                   className="btn btn-danger btn-sm"
                                   style={{ fontSize: "9px", minHeight: "30px" }}
                                 >
+                                  <i className="bi bi-arrow-left button-icon me-1"></i>
                                   Undo
                                 </button>
                               </li>
@@ -1283,6 +1352,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                 className="d-flex justify-content-between align-items-center py-1"
                               >
                                 <span>
+                                  <i className="bi bi-check-circle completed-icon me-1"></i>
                                   <span className="fw-bold text-dark">
                                     {task.completionCount}x
                                   </span>{" "}
@@ -1296,6 +1366,7 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                                   className="btn btn-danger btn-sm"
                                   style={{ fontSize: "9px", minHeight: "30px" }}
                                 >
+                                  <i className="bi bi-arrow-left button-icon me-1"></i>
                                   Undo
                                 </button>
                               </li>
@@ -1350,6 +1421,15 @@ const NormalModeMobile = ({ globalTasks, refreshGlobalTasks }) => {
                           fontSize: "11px",
                         }}
                       >
+                        <i
+                          className={`bi bi-${
+                            {
+                              Average: "list-task",
+                              Advanced: "gear",
+                              Master: "award",
+                            }[category]
+                          } category-icon me-1`}
+                        ></i>
                         {category} ({achievements.length})
                       </button>
                     </h6>
